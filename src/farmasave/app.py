@@ -30,8 +30,23 @@ class Farmasave(toga.App):
             group=toga.Group.COMMANDS,
             order=2
         )
-        self.commands.add(self.import_cmd, self.export_cmd)
-        self.main_window.toolbar.add(self.import_cmd, self.export_cmd)
+        self.schedule_view_cmd = toga.Command(
+            lambda w: self.switch_to_tab(1),
+            text="Πρόγραμμα (Ανάλωση)",
+            tooltip="Μετάβαση στο πρόγραμμα αναλώσεων",
+            group=toga.Group.COMMANDS,
+            order=3
+        )
+        self.stock_view_cmd = toga.Command(
+            lambda w: self.switch_to_tab(2),
+            text="Απόθεμα (Έλεγχος)",
+            tooltip="Μετάβαση στον έλεγχο αποθεμάτων",
+            group=toga.Group.COMMANDS,
+            order=4
+        )
+        
+        self.commands.add(self.import_cmd, self.export_cmd, self.schedule_view_cmd, self.stock_view_cmd)
+        self.main_window.toolbar.add(self.import_cmd, self.export_cmd, self.schedule_view_cmd, self.stock_view_cmd)
 
         # Create an OptionContainer (Tabs)
         
@@ -58,8 +73,15 @@ class Farmasave(toga.App):
         self.main_window.show()
 
     def show_view(self, content):
-        """Replace main window content with a new view (Android-friendly dialog)"""
-        self.main_window.content = content
+        """Replace main window content with a scrollable view (Android-friendly)"""
+        # Wrapping in ScrollContainer ensures fields aren't hidden by keyboard
+        scaler = toga.ScrollContainer(content=content, style=Pack(flex=1))
+        self.main_window.content = scaler
+
+    def switch_to_tab(self, index):
+        """Switch to a specific tab by index"""
+        self.restore_tabs()
+        self.tabs.current_tab = index
 
     def restore_tabs(self, widget=None):
         """Restore the main tab view"""
