@@ -75,26 +75,60 @@ class Farmasave(toga.App):
                 
                 if missing_perms:
                     print(f"DEBUG: Missing permissions: {missing_perms}. Requesting now...")
-                    # Convert list to Java String array
-                    # Rubicon/Chaquopy usually handles list->array conversion automatically for varargs or array params
                     ActivityCompat.requestPermissions(activity, missing_perms, 1001)
                 else:
                     print("DEBUG: All permissions already granted.")
                     
             except Exception as e:
                 print(f"DEBUG: Native Permission Request failed: {e}")
-                # Fallback to Toga's method just in case
-                if toga_request_permissions:
-                    try:
-                         toga_request_permissions(["android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE"])
-                    except:
-                        pass
+
+    def request_android_permissions_manual(self, widget):
+        """Manual trigger for permissions with visual feedback and Android 11+ support"""
+        if not JavaClass:
+            self.main_window.info_dialog("Info", "Not on Android / No Java access.")
+            return
+
+        try:
+            # Get Context/Activity
+            Python = JavaClass("com.chaquo.python.Python")
+            activity = Python.getPlatform().getActivity()
+            
+            # Version Check
+            Build = JavaClass("android.os.Build")
+            sdk_int = Build.VERSION.SDK_INT
+            
+            self.main_window.info_dialog("DEBUG", f"Checking Permissions...\nSDK: {sdk_int}")
+            
+            if sdk_int >= 30: # Android 11+ (R)
+                Environment = JavaClass("android.os.Environment")
+                is_manager = Environment.isExternalStorageManager()
+                
+                if not is_manager:
+                    self.main_window.info_dialog("Action", "Launching Android 11+ 'All Files Access' screen.\nPlease enable Farmasave.")
+                    
+                    Settings = JavaClass("android.provider.Settings")
+                    Uri = JavaClass("android.net.Uri")
+                    Intent = JavaClass("android.content.Intent")
+                    
+                    # Intent.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
+                    intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                    uri = Uri.parse("package:com.spyalekos")
+                    intent.setData(uri)
+                    activity.startActivity(intent)
+                else:
+                     self.main_window.info_dialog("Success", "Android 11+ Storage Manager permission already granted!")
+            
+            else: # Android 10 and below
+                self.request_android_permissions() # Re-use existing logic
+                self.main_window.info_dialog("Info", "Standard permission request sent.\nCheck for popups.")
+
+        except Exception as e:
+            self.main_window.error_dialog("Error", f"Failed to launch permission request:\n{e}")
 
     def startup(self):
         self.main_window = toga.MainWindow(title=self.formal_name)
         
-        # Trigger permission request immediately
-        # We perform this slightly after startup to ensure Activity is fully ready
+        # Trigger permission request immediately (silent attempt)
         self.add_background_task(lambda a: self.request_android_permissions())
         
         # Database initialization with platform-specific path
@@ -153,7 +187,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.1.1", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.1.2", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -318,9 +352,18 @@ class Farmasave(toga.App):
         export_btn = toga.Button("Εξαγωγή σε JSON", on_press=self.handle_export, style=Pack(margin=5))
         import_btn = toga.Button("Εισαγωγή από JSON", on_press=self.handle_import_dialog, style=Pack(margin=5))
         
+        # Manual permission button for Android 11+ or failed auto-requests
+        perm_btn = toga.Button(
+            "Έλεγχος Δικαιωμάτων (Permissions)",
+            on_press=self.request_android_permissions_manual,
+            style=Pack(margin=5, background_color="orange", color="white")
+        )
+        
         container = toga.Box(
             children=[
                 toga.Label("Διαχείριση Δεδομένων", style=Pack(font_weight='bold', font_size=15, padding_bottom=20)),
+                perm_btn, # Add permission button first
+                toga.Box(style=Pack(height=10)), # Spacer
                 export_btn,
                 import_btn
             ],
