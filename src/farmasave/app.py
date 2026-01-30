@@ -15,10 +15,27 @@ class Farmasave(toga.App):
         database.set_db_path(self.paths.data)
         database.create_tables()
 
+        # Commands for the menu (especially for Android)
+        self.import_cmd = toga.Command(
+            self.handle_import_dialog,
+            text="Εισαγωγή JSON",
+            tooltip="Εισαγωγή δεδομένων από αρχείο JSON",
+            group=toga.Group.FILE,
+            order=1
+        )
+        self.export_cmd = toga.Command(
+            self.handle_export,
+            text="Εξαγωγή JSON",
+            tooltip="Εξαγωγή δεδομένων σε αρχείο JSON",
+            group=toga.Group.FILE,
+            order=2
+        )
+        self.commands.add(self.import_cmd, self.export_cmd)
+
         # Create an OptionContainer (Tabs)
         
         # Tabs
-        self.tabs = toga.OptionContainer(on_select=self.handle_tab_change)
+        self.tabs = toga.OptionContainer(on_select=self.handle_tab_change, style=Pack(flex=1))
         
         # Tab 1: Φάρμακα (Medications)
         self.med_box = self.create_medications_tab()
@@ -272,16 +289,18 @@ class Farmasave(toga.App):
                     data = database.export_data()
                     with open(path, 'w', encoding='utf-8') as f:
                         json.dump(data, f, ensure_ascii=False, indent=4)
-                    self.main_window.info_dialog("Επιτυχία", f"Τα δεδομένα εξήχθησαν στο {path}")
+                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", f"Τα δεδομένα εξήχθησαν στο {path}"))
                 except Exception as ex:
-                    self.main_window.error_dialog("Σφάλμα", f"Αποτυχία εξαγωγής: {ex}")
+                    await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εξαγωγής: {ex}"))
 
-        self.main_window.save_file_dialog(
+        dialog = toga.SaveFileDialog(
             title="Εξαγωγή Δεδομένων",
             suggested_filename="medications_backup.json",
             file_types=['json'],
-            on_result=perform_export
         )
+        path = await self.main_window.dialog(dialog)
+        if path:
+            await perform_export(self.main_window, path)
 
     def handle_stock_activate(self, widget, row):
         med_id = int(row.id)
@@ -319,21 +338,19 @@ class Farmasave(toga.App):
         dialog.content = content
         dialog.show()
 
-    def handle_import_dialog(self, widget):
+    async def handle_import_dialog(self, widget):
         """Step 1: Open file dialog to select JSON"""
-        async def on_file_selected(window, path):
-            if path:
-                # Step 2: Open date selection dialog
-                self.open_date_selection_dialog(path)
-
-        self.main_window.open_file_dialog(
+        dialog = toga.OpenFileDialog(
             title="Εισαγωγή Δεδομένων",
             multiple_select=False,
             file_types=['json'],
-            on_result=on_file_selected
         )
+        path = await self.main_window.dialog(dialog)
+        if path:
+            # Step 2: Open date selection dialog
+            await self.open_date_selection_dialog(path)
 
-    def open_date_selection_dialog(self, file_path):
+    async def open_date_selection_dialog(self, file_path):
         """Step 2: Ask for inventory date before importing"""
         content = toga.Box(style=Pack(direction=COLUMN, margin=10))
         
@@ -346,10 +363,10 @@ class Farmasave(toga.App):
             selected_date = date_input.value.strftime("%Y-%m-%d")
             dialog.close()
             
-            if await self.main_window.question_dialog(
+            if await self.main_window.dialog(toga.QuestionDialog(
                 "Προσοχή", 
                 f"Η εισαγωγή για την ημερομηνία {selected_date} θα διαγράψει ΟΛΑ τα τρέχοντα δεδομένα. Συνέχεια;"
-            ):
+            )):
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
@@ -357,9 +374,9 @@ class Farmasave(toga.App):
                     self.refresh_medications()
                     self.refresh_stock()
                     self.refresh_schedule()
-                    self.main_window.info_dialog("Επιτυχία", "Τα δεδομένα εισήχθησαν με επιτυχία.")
+                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Τα δεδομένα εισήχθησαν με επιτυχία."))
                 except Exception as ex:
-                    self.main_window.error_dialog("Σφάλμα", f"Αποτυχία εισαγωγής: {ex}")
+                    await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εισαγωγής: {ex}"))
 
         save_btn = toga.Button("Εισαγωγή", on_press=proceed_import, style=Pack(margin=5))
         cancel_btn = toga.Button("Ακύρωση", on_press=lambda w: dialog.close(), style=Pack(margin=5))
