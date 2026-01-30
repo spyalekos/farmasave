@@ -8,6 +8,12 @@ from . import database
 from . import calculations
 
 class Farmasave(toga.App):
+    def show_view(self, content):
+        """Replace main window content with a scrollable view (Android-friendly)"""
+        # Wrapping in ScrollContainer ensures fields aren't hidden by keyboard
+        scaler = toga.ScrollContainer(content=content, style=Pack(flex=1))
+        self.main_window.content = scaler
+
     def startup(self):
         self.main_window = toga.MainWindow(title=self.formal_name)
         
@@ -20,33 +26,33 @@ class Farmasave(toga.App):
             self.handle_import_dialog,
             text="Εισαγωγή JSON",
             tooltip="Εισαγωγή δεδομένων από αρχείο JSON",
-            group=toga.Group.COMMANDS,
+            group=toga.Group.FILE,
             order=1
         )
         self.export_cmd = toga.Command(
             self.handle_export,
             text="Εξαγωγή JSON",
             tooltip="Εξαγωγή δεδομένων σε αρχείο JSON",
-            group=toga.Group.COMMANDS,
+            group=toga.Group.FILE,
             order=2
         )
         self.schedule_view_cmd = toga.Command(
-            lambda w: self.switch_to_tab(1),
-            text="Πρόγραμμα (Ανάλωση)",
+            self.handle_schedule_view,
+            text="Ανάλωση (Πρόγραμμα)",
             tooltip="Μετάβαση στο πρόγραμμα αναλώσεων",
-            group=toga.Group.COMMANDS,
+            group=toga.Group.VIEW,
             order=3
         )
         self.stock_view_cmd = toga.Command(
-            lambda w: self.switch_to_tab(2),
+            self.handle_stock_view,
             text="Απόθεμα (Έλεγχος)",
             tooltip="Μετάβαση στον έλεγχο αποθεμάτων",
-            group=toga.Group.COMMANDS,
+            group=toga.Group.VIEW,
             order=4
         )
         
         self.commands.add(self.import_cmd, self.export_cmd, self.schedule_view_cmd, self.stock_view_cmd)
-        self.main_window.toolbar.add(self.import_cmd, self.export_cmd, self.schedule_view_cmd, self.stock_view_cmd)
+        # Note: Removing toolbar.add to allow system menu (About) to show correctly on Android
 
         # Create an OptionContainer (Tabs)
         
@@ -56,10 +62,13 @@ class Farmasave(toga.App):
         # Tab 1: Φάρμακα (Medications)
         self.med_box = self.create_medications_tab()
         self.tabs.content.append("Φάρμακα", self.med_box)
+
+        # Version label footer
+        self.med_box.add(toga.Label("v2.0.6", style=Pack(font_size=8, text_align='right', padding=5)))
         
-        # Tab 2: Πρόγραμμα (Schedule)
+        # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
-        self.tabs.content.append("Πρόγραμμα", self.schedule_box)
+        self.tabs.content.append("Ανάλωση", self.schedule_box)
         
         # Tab 3: Απόθεμα (Stock)
         self.stock_box = self.create_stock_tab()
@@ -72,20 +81,22 @@ class Farmasave(toga.App):
         self.main_window.content = self.tabs
         self.main_window.show()
 
-    def show_view(self, content):
-        """Replace main window content with a scrollable view (Android-friendly)"""
-        # Wrapping in ScrollContainer ensures fields aren't hidden by keyboard
-        scaler = toga.ScrollContainer(content=content, style=Pack(flex=1))
-        self.main_window.content = scaler
-
-    def switch_to_tab(self, index):
-        """Switch to a specific tab by index"""
-        self.restore_tabs()
-        self.tabs.current_tab = index
-
     def restore_tabs(self, widget=None):
         """Restore the main tab view"""
         self.main_window.content = self.tabs
+
+    def handle_schedule_view(self, widget):
+        self.switch_to_tab(1)
+
+    def handle_stock_view(self, widget):
+        self.switch_to_tab(2)
+
+    def switch_to_tab(self, index):
+        """Switch to a specific tab by index safely"""
+        self.restore_tabs()
+        # Ensure we target the actual tab object in the OptionContainer
+        target_tab = self.tabs.content[index]
+        self.tabs.current_tab = target_tab
 
     def handle_tab_change(self, widget, **kwargs):
         index = widget.current_tab.index
