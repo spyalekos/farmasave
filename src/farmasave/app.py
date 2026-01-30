@@ -4,11 +4,17 @@ from toga.style.pack import COLUMN, ROW
 import os
 import json
 from datetime import datetime
+# Separate imports to diagnose exactly what is missing
+java_import_error = None
 try:
     from rubicon.java import JavaClass
+except ImportError as e:
+    JavaClass = None
+    java_import_error = str(e)
+
+try:
     from android.permissions import request_permissions as toga_request_permissions
 except ImportError:
-    JavaClass = None
     toga_request_permissions = None
 
 from . import database
@@ -85,7 +91,8 @@ class Farmasave(toga.App):
     def request_android_permissions_manual(self, widget):
         """Manual trigger for permissions with visual feedback and Android 11+ support"""
         if not JavaClass:
-            self.main_window.info_dialog("Info", "Not on Android / No Java access.")
+            msg = f"Not on Android or No Java access.\nError: {java_import_error}"
+            self.main_window.info_dialog("Info", msg)
             return
 
         try:
@@ -187,7 +194,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.1.2", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.1.3", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
