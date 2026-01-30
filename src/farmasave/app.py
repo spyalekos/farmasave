@@ -121,8 +121,9 @@ class Farmasave(toga.App):
             return
 
         try:
-            # Get Context/Activity
-            activity = Python.getPlatform().getActivity()
+            # Get Context (Application Context is safer via Chaquopy Platform)
+            # Python.getPlatform().getActivity() does not exist in some versions.
+            context = Python.getPlatform().getApplication()
             
             # Version Check
             Build = get_android_class("android.os.Build")
@@ -144,7 +145,12 @@ class Farmasave(toga.App):
                     intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                     uri = Uri.parse("package:com.spyalekos")
                     intent.setData(uri)
-                    activity.startActivity(intent)
+                    
+                    # REQUIRED for starting activity from Application Context
+                    FLAG_ACTIVITY_NEW_TASK = 0x10000000
+                    intent.addFlags(FLAG_ACTIVITY_NEW_TASK)
+                    
+                    context.startActivity(intent)
                 else:
                      self.main_window.info_dialog("Success", "Already granted (Manager)!")
             
@@ -219,7 +225,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.1.4", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.1.5", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
