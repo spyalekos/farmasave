@@ -207,44 +207,50 @@ class Farmasave(toga.App):
         database.set_db_path(self.paths.data)
         database.create_tables()
 
-        # Commands for the menu (especially for Android)
+        # Custom Greek menu groups
+        ARXEIO_GROUP = toga.Group("Αρχείο", order=0)
+        PROBOLI_GROUP = toga.Group("Προβολή", order=1)
+        VOITHEIA_GROUP = toga.Group("Βοήθεια", order=99)
+
+        # Wrapper functions for async handlers (toga.Command doesn't support async directly)
+        def do_import(widget):
+            self.add_background_task(lambda app: self.handle_import_dialog(widget))
+        
+        def do_export(widget):
+            self.add_background_task(lambda app: self.handle_export(widget))
+
+        # Commands for the menu
         self.import_cmd = toga.Command(
-            self.handle_import_dialog,
+            do_import,
             text="Εισαγωγή JSON",
             tooltip="Εισαγωγή δεδομένων από αρχείο JSON",
-            group=toga.Group.FILE,
+            group=ARXEIO_GROUP,
             order=1
         )
         self.export_cmd = toga.Command(
-            self.handle_export,
+            do_export,
             text="Εξαγωγή JSON",
             tooltip="Εξαγωγή δεδομένων σε αρχείο JSON",
-            group=toga.Group.FILE,
+            group=ARXEIO_GROUP,
             order=2
         )
         self.schedule_view_cmd = toga.Command(
             self.handle_schedule_view,
             text="Ανάλωση (Πρόγραμμα)",
             tooltip="Μετάβαση στο πρόγραμμα αναλώσεων",
-            group=toga.Group.VIEW,
-            order=3
+            group=PROBOLI_GROUP,
+            order=1
         )
         self.stock_view_cmd = toga.Command(
             self.handle_stock_view,
             text="Απόθεμα (Έλεγχος)",
             tooltip="Μετάβαση στον έλεγχο αποθεμάτων",
-            group=toga.Group.VIEW,
-            order=4
+            group=PROBOLI_GROUP,
+            order=2
         )
         
-        self.about_cmd = toga.Command(
-            lambda w: self.about(),
-            text="Σχετικά με το Farmasave",
-            group=toga.Group.HELP
-        )
-        
-        self.commands.add(self.import_cmd, self.export_cmd, self.schedule_view_cmd, self.stock_view_cmd, self.about_cmd)
-        # Note: Removing toolbar.add to allow system menu (About) to show correctly on Android
+        # Only add custom commands, NOT about (Toga handles About automatically)
+        self.commands.add(self.import_cmd, self.export_cmd, self.schedule_view_cmd, self.stock_view_cmd)
 
         # Create an OptionContainer (Tabs)
         
@@ -259,7 +265,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.1.7", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.1.8", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
