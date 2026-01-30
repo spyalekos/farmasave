@@ -1,0 +1,47 @@
+[tool.briefcase]
+project_name = "Farmasave"
+bundle = "com.spyalekos"
+version = "2.0.0"
+url = "https://github.com/spyalekos/farmasave"
+license.text = "Other/Proprietary"
+author = "SpyAlekos"
+author_email = "spyalekos@gmail.com"
+
+[tool.briefcase.app.farmasave]
+formal_name = "Farmasave"
+description = "Διαχειριστής Φαρμάκων"
+sources = ["src/farmasave"]
+requires = [
+    "fpdf2>=2.8.5",
+]
+
+[tool.briefcase.app.farmasave.macOS]
+requires = [
+    "toga-cocoa~=0.5.0",
+]
+
+[tool.briefcase.app.farmasave.linux]
+requires = [
+    "toga-gtk~=0.5.0",
+    "pygobject < 3.52.1",
+]
+
+[tool.briefcase.app.farmasave.windows]
+requires = [
+    "toga-winforms~=0.5.0",
+]
+
+[tool.briefcase.app.farmasave.android]
+requires = [
+    "toga-android~=0.5.0",
+]
+build_gradle_dependencies = [
+    "androidx.appcompat:appcompat:1.6.1",
+    "com.google.android.material:material:1.9.0",
+]
+permissions = ["CAMERA"]
+
+[tool.briefcase.app.farmasave.iOS]
+requires = [
+    "toga-ios~=0.5.0",
+]
