@@ -63,50 +63,84 @@ class Farmasave(toga.App):
         self.main_window.content = scaler
 
     def request_android_permissions(self):
-        """Ask for storage permissions using Native Java (ActivityCompat) via Chaquopy"""
-        if JavaClass:
-            try:
-                print("DEBUG: Attempting Native Java Permission Request...")
+        """Ask for storage permissions using Native Java via Rubicon/Chaquopy"""
+        Python = get_android_class("com.chaquo.python.Python")
+        if not Python:
+            print("DEBUG: Java bridge not available, skipping permission request")
+            return
+            
+        try:
+            print("DEBUG: Attempting Native Java Permission Request...")
+            
+            # Get context
+            context = Python.getPlatform().getApplication()
+            
+            # Check Android version first
+            Build = get_android_class("android.os.Build")
+            sdk_int = Build.VERSION.SDK_INT
+            print(f"DEBUG: Android SDK version: {sdk_int}")
+            
+            if sdk_int >= 30:  # Android 11+ (R)
+                # For Android 11+, we need MANAGE_EXTERNAL_STORAGE
+                Environment = get_android_class("android.os.Environment")
+                is_manager = Environment.isExternalStorageManager()
                 
-                # Get the current Activity
-                Python = JavaClass("com.chaquo.python.Python")
-                app_context = Python.getPlatform().getApplication()
-                
-                # We need the Activity, not just Application context, for ActivityCompat
-                # In Chaquopy/Briefcase, the main activity usually holds the Python instance
-                # We can try to get it via Python.getPlatform().getActivity() if available, 
-                # or fallback to Toga's internal reference if exposed.
-                
-                # Toga Android creates a MainActivity. Let's try traversing.
-                # Actually, Chaquopy 10+ exposes Python.getPlatform().getActivity()
-                activity = Python.getPlatform().getActivity()
-                
-                # Import Android classes
-                Manifest = JavaClass("android.Manifest")
-                ActivityCompat = JavaClass("androidx.core.app.ActivityCompat")
-                PackageManager = JavaClass("android.content.pm.PackageManager")
-                ContextCompat = JavaClass("androidx.core.content.ContextCompat")
-                
-                # Define permissions
-                perms = [
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                ]
-                
-                # Check if we already have them
-                missing_perms = []
-                for p in perms:
-                    if ContextCompat.checkSelfPermission(activity, p) != PackageManager.PERMISSION_GRANTED:
-                        missing_perms.append(p)
-                
-                if missing_perms:
-                    print(f"DEBUG: Missing permissions: {missing_perms}. Requesting now...")
-                    ActivityCompat.requestPermissions(activity, missing_perms, 1001)
-                else:
-                    print("DEBUG: All permissions already granted.")
+                if not is_manager:
+                    print("DEBUG: Need MANAGE_EXTERNAL_STORAGE, launching settings...")
+                    Settings = get_android_class("android.provider.Settings")
+                    Uri = get_android_class("android.net.Uri")
+                    Intent = get_android_class("android.content.Intent")
                     
-            except Exception as e:
-                print(f"DEBUG: Native Permission Request failed: {e}")
+                    intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                    uri = Uri.parse("package:" + context.getPackageName())
+                    intent.setData(uri)
+                    
+                    # FLAG_ACTIVITY_NEW_TASK required for Application Context
+                    FLAG_ACTIVITY_NEW_TASK = 0x10000000
+                    intent.addFlags(FLAG_ACTIVITY_NEW_TASK)
+                    
+                    context.startActivity(intent)
+                else:
+                    print("DEBUG: MANAGE_EXTERNAL_STORAGE already granted.")
+            else:
+                # For Android 10 and below, use ActivityCompat
+                # Try to get Activity for permission request
+                try:
+                    activity = Python.getPlatform().getActivity()
+                    
+                    Manifest = get_android_class("android.Manifest")
+                    ActivityCompat = get_android_class("androidx.core.app.ActivityCompat")
+                    PackageManager = get_android_class("android.content.pm.PackageManager")
+                    ContextCompat = get_android_class("androidx.core.content.ContextCompat")
+                    
+                    if all([Manifest, ActivityCompat, PackageManager, ContextCompat]):
+                        perms = [
+                            Manifest.permission.READ_EXTERNAL_STORAGE,
+                            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        ]
+                        
+                        missing_perms = []
+                        for p in perms:
+                            if ContextCompat.checkSelfPermission(activity, p) != PackageManager.PERMISSION_GRANTED:
+                                missing_perms.append(p)
+                        
+                        if missing_perms:
+                            print(f"DEBUG: Missing permissions: {missing_perms}. Requesting now...")
+                            ActivityCompat.requestPermissions(activity, missing_perms, 1001)
+                        else:
+                            print("DEBUG: All permissions already granted.")
+                    else:
+                        print("DEBUG: Could not load all required classes for permission check")
+                        # Fallback to Toga permissions
+                        if toga_request_permissions:
+                            toga_request_permissions(["android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE"])
+                except Exception as e:
+                    print(f"DEBUG: ActivityCompat failed: {e}, trying Toga fallback")
+                    if toga_request_permissions:
+                        toga_request_permissions(["android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE"])
+                    
+        except Exception as e:
+            print(f"DEBUG: Native Permission Request failed: {e}")
 
 
     def request_android_permissions_manual(self, widget):
@@ -225,7 +259,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.1.6", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.1.7", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()

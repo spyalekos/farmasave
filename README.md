@@ -1,61 +1,45 @@
-# Farmasave app
+# Farmasave
 
-## Run the app
+Διαχειριστής Φαρμάκων για Android - Medication Manager App
 
-### uv
+## Χαρακτηριστικά
 
-Run as a desktop app:
+- Διαχείριση φαρμάκων (προσθήκη, επεξεργασία, διαγραφή)
+- Υπολογισμός ημερομηνιών εξάντλησης
+- Έλεγχος αποθεμάτων
+- Εισαγωγή/Εξαγωγή δεδομένων σε JSON
+- Ελληνική γλώσσα
 
-```
-uv run flet run
-```
+## Εγκατάσταση
 
-Run as a web app:
+Κατεβάστε το τελευταίο APK από τα [Releases](https://github.com/spyalekos/farmasave/releases).
 
-```
-uv run flet run --web
-```
+## Build
 
-For more details on running the app, refer to the [Getting Started Guide](https://docs.flet.dev/).
+### Android APK (Briefcase)
 
-## Build the app
-
-### Android
-
-```
-flet build apk -v
+```bash
+briefcase build android
 ```
 
-For more details on building and signing `.apk` or `.aab`, refer to the [Android Packaging Guide](https://docs.flet.dev/publish/android/).
+Το APK δημιουργείται στο: `build/farmasave/android/gradle/app/build/outputs/apk/debug/app-debug.apk`
 
-### iOS
+### Desktop (Linux/Windows/macOS)
 
-```
-flet build ipa -v
-```
-
-For more details on building and signing `.ipa`, refer to the [iOS Packaging Guide](https://docs.flet.dev/publish/ios/).
-
-### macOS
-
-```
-flet build macos -v
+```bash
+briefcase run
 ```
 
-For more details on building macOS package, refer to the [macOS Packaging Guide](https://docs.flet.dev/publish/macos/).
+## Changelog
 
-### Linux
+### v2.1.7 (2026-01-30)
+- **Διόρθωση**: Επίλυση bug στα δικαιώματα Android (undefined JavaClass)
+- **Βελτίωση**: Προσθήκη MANAGE_EXTERNAL_STORAGE για Android 11+
+- **Βελτίωση**: Αυτόματο άνοιγμα ρυθμίσεων "All Files Access" σε Android 11+
 
-```
-flet build linux -v
-```
+### v2.1.6
+- Αρχική έκδοση με Toga/Briefcase
 
-For more details on building Linux package, refer to the [Linux Packaging Guide](https://docs.flet.dev/publish/linux/).
+## Άδεια
 
-### Windows
-
-```
-flet build windows -v
-```
-
-For more details on building Windows package, refer to the [Windows Packaging Guide](https://docs.flet.dev/publish/windows/).
+Proprietary - SpyAlekos
