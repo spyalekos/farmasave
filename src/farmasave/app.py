@@ -143,7 +143,7 @@ class Farmasave(toga.App):
                     Intent = get_android_class("android.content.Intent")
                     
                     intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                    uri = Uri.parse("package:com.spyalekos")
+                    uri = Uri.parse("package:" + context.getPackageName())
                     intent.setData(uri)
                     
                     # REQUIRED for starting activity from Application Context
@@ -225,7 +225,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.1.5", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.1.6", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
