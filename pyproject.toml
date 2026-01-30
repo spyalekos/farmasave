@@ -1,7 +1,7 @@
 [tool.briefcase]
 project_name = "Farmasave"
 bundle = "com.spyalekos"
-version = "2.0.0"
+version = "2.0.2"
 url = "https://github.com/spyalekos/farmasave"
 license.text = "Other/Proprietary"
 author = "SpyAlekos"

@@ -27,10 +27,11 @@ class Farmasave(toga.App):
             self.handle_export,
             text="Εξαγωγή JSON",
             tooltip="Εξαγωγή δεδομένων σε αρχείο JSON",
-            group=toga.Group.FILE,
+            group=toga.Group.COMMANDS,
             order=2
         )
         self.commands.add(self.import_cmd, self.export_cmd)
+        self.main_window.toolbar.add(self.import_cmd, self.export_cmd)
 
         # Create an OptionContainer (Tabs)
         
@@ -55,6 +56,14 @@ class Farmasave(toga.App):
         
         self.main_window.content = self.tabs
         self.main_window.show()
+
+    def show_view(self, content):
+        """Replace main window content with a new view (Android-friendly dialog)"""
+        self.main_window.content = content
+
+    def restore_tabs(self, widget=None):
+        """Restore the main tab view"""
+        self.main_window.content = self.tabs
 
     def handle_tab_change(self, widget, **kwargs):
         index = widget.current_tab.index
@@ -258,28 +267,25 @@ class Farmasave(toga.App):
                 database.add_medication(name, typ, ppb, boxes, pieces, dosage)
             
             self.refresh_medications()
-            dialog.close()
+            self.restore_tabs()
 
         async def delete_medication(widget):
             if await self.main_window.question_dialog("Διαγραφή", "Είστε σίγουροι ότι θέλετε να διαγράψετε αυτό το φάρμακο;"):
                 database.delete_medication(med_data['id'])
                 self.refresh_medications()
-                dialog.close()
+                self.restore_tabs()
 
         save_btn = toga.Button("Αποθήκευση", on_press=save_medication, style=Pack(margin=5))
-        cancel_btn = toga.Button("Ακύρωση", on_press=lambda w: dialog.close(), style=Pack(margin=5))
+        cancel_btn = toga.Button("Ακύρωση", on_press=self.restore_tabs, style=Pack(margin=5))
         
-        buttons = [save_btn, cancel_btn]
+        btn_box = toga.Box(children=[save_btn, cancel_btn], style=Pack(direction=ROW))
+        
         if is_edit:
-            del_btn = toga.Button("Διαγραφή", on_press=delete_medication, style=Pack(margin=5, color='red'))
-            buttons.insert(1, del_btn)
-
-        button_box = toga.Box(children=buttons, style=Pack(direction=ROW))
-        content.add(button_box)
-
-        dialog = toga.Window(title=title, size=(300, 450))
-        dialog.content = content
-        dialog.show()
+            del_btn = toga.Button("Διαγραφή", on_press=delete_medication, style=Pack(margin=5))
+            btn_box.add(del_btn)
+            
+        content.add(btn_box)
+        self.show_view(content)
 
     async def handle_export(self, widget):
         """Open a save file dialog to export JSON data"""
@@ -325,18 +331,15 @@ class Farmasave(toga.App):
                 database.update_stock(med_id, boxes, pieces)
                 self.refresh_stock()
                 self.refresh_medications()
-                dialog.close()
+                self.restore_tabs()
             except ValueError:
-                self.main_window.error_dialog("Σφάλμα", "Παρακαλώ εισάγετε έγκυρους αριθμούς.")
+                self.main_window.dialog(toga.ErrorDialog("Σφάλμα", "Παρακαλώ εισάγετε έγκυρους αριθμούς."))
 
         save_btn = toga.Button("Αποθήκευση", on_press=save_stock, style=Pack(margin=5))
-        cancel_btn = toga.Button("Ακύρωση", on_press=lambda w: dialog.close(), style=Pack(margin=5))
+        cancel_btn = toga.Button("Ακύρωση", on_press=self.restore_tabs, style=Pack(margin=5))
         
         content.add(toga.Box(children=[save_btn, cancel_btn], style=Pack(direction=ROW)))
-
-        dialog = toga.Window(title="Ενημέρωση Αποθέματος", size=(300, 250))
-        dialog.content = content
-        dialog.show()
+        self.show_view(content)
 
     async def handle_import_dialog(self, widget):
         """Step 1: Open file dialog to select JSON"""
@@ -361,7 +364,7 @@ class Farmasave(toga.App):
         
         async def proceed_import(widget):
             selected_date = date_input.value.strftime("%Y-%m-%d")
-            dialog.close()
+            self.restore_tabs()
             
             if await self.main_window.dialog(toga.QuestionDialog(
                 "Προσοχή", 
@@ -379,12 +382,9 @@ class Farmasave(toga.App):
                     await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εισαγωγής: {ex}"))
 
         save_btn = toga.Button("Εισαγωγή", on_press=proceed_import, style=Pack(margin=5))
-        cancel_btn = toga.Button("Ακύρωση", on_press=lambda w: dialog.close(), style=Pack(margin=5))
+        cancel_btn = toga.Button("Ακύρωση", on_press=self.restore_tabs, style=Pack(margin=5))
         content.add(toga.Box(children=[save_btn, cancel_btn], style=Pack(direction=ROW)))
-
-        dialog = toga.Window(title="Ημερομηνία Ελέγχου", size=(300, 200))
-        dialog.content = content
-        dialog.show()
+        self.show_view(content)
 
 def main():
     return Farmasave("Farmasave", "com.spyalekos.farmasave")
