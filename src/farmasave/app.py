@@ -5,10 +5,11 @@ import os
 import json
 from datetime import datetime
 try:
-    from android.permissions import request_permissions as toga_request_permissions, Permission
+    from rubicon.java import JavaClass
+    from android.permissions import request_permissions as toga_request_permissions
 except ImportError:
+    JavaClass = None
     toga_request_permissions = None
-    Permission = None
 
 from . import database
 from . import calculations
@@ -35,24 +36,65 @@ class Farmasave(toga.App):
         scaler = toga.ScrollContainer(content=content, style=Pack(flex=1))
         self.main_window.content = scaler
 
-    async def request_android_permissions(self):
-        """Ask for storage permissions using Chaquopy's Java bridge for maximum reliability"""
-        if toga_request_permissions:
-            print("DEBUG: Requesting permissions via Toga/Android...")
+    def request_android_permissions(self):
+        """Ask for storage permissions using Native Java (ActivityCompat) via Chaquopy"""
+        if JavaClass:
             try:
-                # We request both for broader compatibility
-                toga_request_permissions([
-                    "android.permission.READ_EXTERNAL_STORAGE",
-                    "android.permission.WRITE_EXTERNAL_STORAGE"
-                ])
-                print("DEBUG: Permission request sent.")
+                print("DEBUG: Attempting Native Java Permission Request...")
+                
+                # Get the current Activity
+                Python = JavaClass("com.chaquo.python.Python")
+                app_context = Python.getPlatform().getApplication()
+                
+                # We need the Activity, not just Application context, for ActivityCompat
+                # In Chaquopy/Briefcase, the main activity usually holds the Python instance
+                # We can try to get it via Python.getPlatform().getActivity() if available, 
+                # or fallback to Toga's internal reference if exposed.
+                
+                # Toga Android creates a MainActivity. Let's try traversing.
+                # Actually, Chaquopy 10+ exposes Python.getPlatform().getActivity()
+                activity = Python.getPlatform().getActivity()
+                
+                # Import Android classes
+                Manifest = JavaClass("android.Manifest")
+                ActivityCompat = JavaClass("androidx.core.app.ActivityCompat")
+                PackageManager = JavaClass("android.content.pm.PackageManager")
+                ContextCompat = JavaClass("androidx.core.content.ContextCompat")
+                
+                # Define permissions
+                perms = [
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                ]
+                
+                # Check if we already have them
+                missing_perms = []
+                for p in perms:
+                    if ContextCompat.checkSelfPermission(activity, p) != PackageManager.PERMISSION_GRANTED:
+                        missing_perms.append(p)
+                
+                if missing_perms:
+                    print(f"DEBUG: Missing permissions: {missing_perms}. Requesting now...")
+                    # Convert list to Java String array
+                    # Rubicon/Chaquopy usually handles list->array conversion automatically for varargs or array params
+                    ActivityCompat.requestPermissions(activity, missing_perms, 1001)
+                else:
+                    print("DEBUG: All permissions already granted.")
+                    
             except Exception as e:
-                print(f"DEBUG: Permission Request failed: {e}")
+                print(f"DEBUG: Native Permission Request failed: {e}")
+                # Fallback to Toga's method just in case
+                if toga_request_permissions:
+                    try:
+                         toga_request_permissions(["android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE"])
+                    except:
+                        pass
 
     def startup(self):
         self.main_window = toga.MainWindow(title=self.formal_name)
         
         # Trigger permission request immediately
+        # We perform this slightly after startup to ensure Activity is fully ready
         self.add_background_task(lambda a: self.request_android_permissions())
         
         # Database initialization with platform-specific path
@@ -111,7 +153,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.1.0", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.1.1", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
