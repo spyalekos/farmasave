@@ -4,6 +4,12 @@ from toga.style.pack import COLUMN, ROW
 import os
 import json
 from datetime import datetime
+try:
+    from android.permissions import request_permissions, Permission
+except ImportError:
+    # Not on Android
+    request_permissions = None
+    Permission = None
 from . import database
 from . import calculations
 
@@ -31,6 +37,10 @@ class Farmasave(toga.App):
 
     def startup(self):
         self.main_window = toga.MainWindow(title=self.formal_name)
+        
+        # Request permissions for Android
+        if request_permissions:
+            request_permissions([Permission.WRITE_EXTERNAL_STORAGE, Permission.READ_EXTERNAL_STORAGE])
         
         # Database initialization with platform-specific path
         database.set_db_path(self.paths.data)
@@ -77,15 +87,18 @@ class Farmasave(toga.App):
 
         # Create an OptionContainer (Tabs)
         
-        # Tabs
-        self.tabs = toga.OptionContainer(on_select=self.handle_tab_change, style=Pack(flex=1))
+        # Tabs - Applying color style (Turquoise for active/contrast)
+        self.tabs = toga.OptionContainer(
+            on_select=self.handle_tab_change, 
+            style=Pack(flex=1, color="turquoise")
+        )
         
         # Tab 1: Φάρμακα (Medications)
         self.med_box = self.create_medications_tab()
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.0.8", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.0.9", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -359,9 +372,10 @@ class Farmasave(toga.App):
                     print(f"DEBUG: Export Error: {ex}")
                     await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εξαγωγής: {ex}\nΠροσπαθήστε να αποθηκεύσετε στο φάκελο 'Λήψεις' (Downloads)."))
 
+        suggested_name = f"meds_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
         dialog = toga.SaveFileDialog(
             title="Εξαγωγή Δεδομένων",
-            suggested_filename="medications_backup.json",
+            suggested_filename=suggested_name,
             file_types=['json'],
         )
         path = await self.main_window.dialog(dialog)
