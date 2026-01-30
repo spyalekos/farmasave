@@ -20,7 +20,7 @@ class Farmasave(toga.App):
             self.handle_import_dialog,
             text="Εισαγωγή JSON",
             tooltip="Εισαγωγή δεδομένων από αρχείο JSON",
-            group=toga.Group.FILE,
+            group=toga.Group.COMMANDS,
             order=1
         )
         self.export_cmd = toga.Command(
@@ -206,9 +206,9 @@ class Farmasave(toga.App):
         )
         return container
 
-    def handle_med_activate(self, widget, row):
+    async def handle_med_activate(self, widget, row):
         med_id = int(row.id)
-        self.open_medication_dialog(med_data={
+        await self.open_medication_dialog(med_data={
             'id': med_id,
             'name': row.name,
             'type': row.type,
@@ -218,11 +218,11 @@ class Farmasave(toga.App):
             'dosage': row.dosage,
         })
 
-    def handle_add_med(self, widget):
+    async def handle_add_med(self, widget):
         """Open empty dialog for adding new medication"""
-        self.open_medication_dialog(med_data=None)
+        await self.open_medication_dialog(med_data=None)
 
-    def open_medication_dialog(self, med_data=None):
+    async def open_medication_dialog(self, med_data=None):
         is_edit = med_data is not None
         title = "Επεξεργασία Φαρμάκου" if is_edit else "Προσθήκη Φαρμάκου"
         
@@ -254,11 +254,11 @@ class Farmasave(toga.App):
                 pieces = int(pieces_input.value or 0)
                 dosage = int(dosage_input.value or 0)
             except ValueError:
-                self.main_window.error_dialog("Σφάλμα", "Παρακαλώ εισάγετε έγκυρους αριθμούς.")
+                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", "Παρακαλώ εισάγετε έγκυρους αριθμούς."))
                 return
 
             if not name or not typ:
-                self.main_window.error_dialog("Σφάλμα", "Το όνομα και ο τύπος είναι υποχρεωτικά.")
+                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", "Το όνομα και ο τύπος είναι υποχρεωτικά."))
                 return
 
             if is_edit:
@@ -308,7 +308,7 @@ class Farmasave(toga.App):
         if path:
             await perform_export(self.main_window, path)
 
-    def handle_stock_activate(self, widget, row):
+    async def handle_stock_activate(self, widget, row):
         med_id = int(row.id)
         name = row.name
         
@@ -324,7 +324,7 @@ class Farmasave(toga.App):
             style=Pack(direction=COLUMN, margin=10)
         )
 
-        def save_stock(widget):
+        async def save_stock(widget):
             try:
                 boxes = int(boxes_input.value or 0)
                 pieces = int(pieces_input.value or 0)
@@ -333,7 +333,7 @@ class Farmasave(toga.App):
                 self.refresh_medications()
                 self.restore_tabs()
             except ValueError:
-                self.main_window.dialog(toga.ErrorDialog("Σφάλμα", "Παρακαλώ εισάγετε έγκυρους αριθμούς."))
+                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", "Παρακαλώ εισάγετε έγκυρους αριθμούς."))
 
         save_btn = toga.Button("Αποθήκευση", on_press=save_stock, style=Pack(margin=5))
         cancel_btn = toga.Button("Ακύρωση", on_press=self.restore_tabs, style=Pack(margin=5))
