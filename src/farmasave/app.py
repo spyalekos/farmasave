@@ -5,11 +5,11 @@ import os
 import json
 from datetime import datetime
 try:
-    from android.permissions import request_permissions, Permission
+    from android.permissions import request_permissions as toga_request_permissions, Permission
 except ImportError:
-    # Not on Android
-    request_permissions = None
+    toga_request_permissions = None
     Permission = None
+
 from . import database
 from . import calculations
 
@@ -35,12 +35,25 @@ class Farmasave(toga.App):
         scaler = toga.ScrollContainer(content=content, style=Pack(flex=1))
         self.main_window.content = scaler
 
+    async def request_android_permissions(self):
+        """Ask for storage permissions using Chaquopy's Java bridge for maximum reliability"""
+        if toga_request_permissions:
+            print("DEBUG: Requesting permissions via Toga/Android...")
+            try:
+                # We request both for broader compatibility
+                toga_request_permissions([
+                    "android.permission.READ_EXTERNAL_STORAGE",
+                    "android.permission.WRITE_EXTERNAL_STORAGE"
+                ])
+                print("DEBUG: Permission request sent.")
+            except Exception as e:
+                print(f"DEBUG: Permission Request failed: {e}")
+
     def startup(self):
         self.main_window = toga.MainWindow(title=self.formal_name)
         
-        # Request permissions for Android
-        if request_permissions:
-            request_permissions([Permission.WRITE_EXTERNAL_STORAGE, Permission.READ_EXTERNAL_STORAGE])
+        # Trigger permission request immediately
+        self.add_background_task(lambda a: self.request_android_permissions())
         
         # Database initialization with platform-specific path
         database.set_db_path(self.paths.data)
@@ -95,22 +108,22 @@ class Farmasave(toga.App):
         
         # Tab 1: Φάρμακα (Medications)
         self.med_box = self.create_medications_tab()
-        self.tabs.content.append("Φάρμακα", self.med_box)
+        self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.0.9", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.1.0", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
-        self.tabs.content.append("Ανάλωση", self.schedule_box)
+        self.tabs.content.append("Ανάλωση", self.schedule_box, icon="resources/star.png")
         
         # Tab 3: Απόθεμα (Stock)
         self.stock_box = self.create_stock_tab()
-        self.tabs.content.append("Απόθεμα", self.stock_box)
+        self.tabs.content.append("Απόθεμα", self.stock_box, icon="resources/star.png")
         
-        # Tab 4: I/O
+        # Tab 4: I/O (Export/Import)
         self.io_box = self.create_io_tab()
-        self.tabs.content.append("I/O", self.io_box)
+        self.tabs.content.append("I/O", self.io_box, icon="resources/star.png")
         
         self.main_window.content = self.tabs
         self.main_window.show()
