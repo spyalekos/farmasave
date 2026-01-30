@@ -4,13 +4,33 @@ from toga.style.pack import COLUMN, ROW
 import os
 import json
 from datetime import datetime
-# Separate imports to diagnose exactly what is missing
+# Robust Java Access (Rubicon vs Chaquopy Native)
+AndroidJavaClass = None
 java_import_error = None
-try:
-    from rubicon.java import JavaClass
-except ImportError as e:
-    JavaClass = None
-    java_import_error = str(e)
+
+def get_android_class(class_name):
+    """Helper to get Java classes using either Rubicon or Chaquopy native"""
+    global AndroidJavaClass
+    if AndroidJavaClass is None:
+        try:
+            from rubicon.java import JavaClass as RubiconJavaClass
+            AndroidJavaClass = RubiconJavaClass
+            print("DEBUG: Using Rubicon Java Bridge")
+        except ImportError:
+            try:
+                from java import jclass as ChaquopyJavaClass
+                AndroidJavaClass = ChaquopyJavaClass
+                print("DEBUG: Using Chaquopy Native Java Bridge")
+            except ImportError as e2:
+                print(f"DEBUG: No Java Bridge available. {e2}")
+                return None
+    
+    try:
+        if AndroidJavaClass:
+            return AndroidJavaClass(class_name)
+    except Exception as e:
+        print(f"DEBUG: Failed to load class {class_name}: {e}")
+    return None
 
 try:
     from android.permissions import request_permissions as toga_request_permissions
@@ -88,49 +108,54 @@ class Farmasave(toga.App):
             except Exception as e:
                 print(f"DEBUG: Native Permission Request failed: {e}")
 
+
     def request_android_permissions_manual(self, widget):
-        """Manual trigger for permissions with visual feedback and Android 11+ support"""
-        if not JavaClass:
-            msg = f"Not on Android or No Java access.\nError: {java_import_error}"
-            self.main_window.info_dialog("Info", msg)
+        """Manual trigger for permissions using robust loading"""
+        self.main_window.info_dialog("DEBUG", "Starting Permission Check...")
+        
+        # Test loading a basic class
+        Python = get_android_class("com.chaquo.python.Python")
+        
+        if not Python:
+            self.main_window.info_dialog("Error", "Could not load Java Bridge.\nWe are likely not on Android.")
             return
 
         try:
             # Get Context/Activity
-            Python = JavaClass("com.chaquo.python.Python")
             activity = Python.getPlatform().getActivity()
             
             # Version Check
-            Build = JavaClass("android.os.Build")
+            Build = get_android_class("android.os.Build")
             sdk_int = Build.VERSION.SDK_INT
             
-            self.main_window.info_dialog("DEBUG", f"Checking Permissions...\nSDK: {sdk_int}")
+            self.main_window.info_dialog("DEBUG", f"Bridge OK.\nSDK: {sdk_int}")
             
             if sdk_int >= 30: # Android 11+ (R)
-                Environment = JavaClass("android.os.Environment")
+                Environment = get_android_class("android.os.Environment")
                 is_manager = Environment.isExternalStorageManager()
                 
                 if not is_manager:
-                    self.main_window.info_dialog("Action", "Launching Android 11+ 'All Files Access' screen.\nPlease enable Farmasave.")
+                    self.main_window.info_dialog("Action", "Launching 'All Files Access'.")
                     
-                    Settings = JavaClass("android.provider.Settings")
-                    Uri = JavaClass("android.net.Uri")
-                    Intent = JavaClass("android.content.Intent")
+                    Settings = get_android_class("android.provider.Settings")
+                    Uri = get_android_class("android.net.Uri")
+                    Intent = get_android_class("android.content.Intent")
                     
-                    # Intent.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
                     intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                     uri = Uri.parse("package:com.spyalekos")
                     intent.setData(uri)
                     activity.startActivity(intent)
                 else:
-                     self.main_window.info_dialog("Success", "Android 11+ Storage Manager permission already granted!")
+                     self.main_window.info_dialog("Success", "Already granted (Manager)!")
             
             else: # Android 10 and below
-                self.request_android_permissions() # Re-use existing logic
-                self.main_window.info_dialog("Info", "Standard permission request sent.\nCheck for popups.")
+                # Fallback to Toga logic or raw intent
+                if toga_request_permissions:
+                     toga_request_permissions(["android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE"])
+                self.main_window.info_dialog("Info", "Standard request sent.")
 
         except Exception as e:
-            self.main_window.error_dialog("Error", f"Failed to launch permission request:\n{e}")
+            self.main_window.error_dialog("Error", f"Crash during request:\n{e}")
 
     def startup(self):
         self.main_window = toga.MainWindow(title=self.formal_name)
@@ -194,7 +219,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.1.3", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.1.4", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
