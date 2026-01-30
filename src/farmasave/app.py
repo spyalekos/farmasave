@@ -8,6 +8,21 @@ from . import database
 from . import calculations
 
 class Farmasave(toga.App):
+    def on_exit(self, **kwargs):
+        """Handle the Android back button / exit attempt"""
+        # 1. If we are in a sub-view (like Add Medication), go back to tabs
+        if self.main_window.content != self.tabs:
+            self.restore_tabs()
+            return False
+        
+        # 2. If we are in a tab other than the first one, go back to Tab 0
+        if self.tabs.current_tab != self.tabs.content[0]:
+            self.switch_to_tab(0)
+            return False
+            
+        # 3. Otherwise, allow exit
+        return True
+
     def show_view(self, content):
         """Replace main window content with a scrollable view (Android-friendly)"""
         # Wrapping in ScrollContainer ensures fields aren't hidden by keyboard
@@ -51,7 +66,13 @@ class Farmasave(toga.App):
             order=4
         )
         
-        self.commands.add(self.import_cmd, self.export_cmd, self.schedule_view_cmd, self.stock_view_cmd)
+        self.about_cmd = toga.Command(
+            lambda w: self.about(),
+            text="Σχετικά με το Farmasave",
+            group=toga.Group.HELP
+        )
+        
+        self.commands.add(self.import_cmd, self.export_cmd, self.schedule_view_cmd, self.stock_view_cmd, self.about_cmd)
         # Note: Removing toolbar.add to allow system menu (About) to show correctly on Android
 
         # Create an OptionContainer (Tabs)
@@ -64,7 +85,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.0.6", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.0.7", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -326,11 +347,14 @@ class Farmasave(toga.App):
             if path:
                 try:
                     data = database.export_data()
-                    with open(path, 'w', encoding='utf-8') as f:
+                    # Log the path for debugging
+                    print(f"DEBUG: Exporting to {path}")
+                    with open(str(path), 'w', encoding='utf-8') as f:
                         json.dump(data, f, ensure_ascii=False, indent=4)
-                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", f"Τα δεδομένα εξήχθησαν στο {path}"))
+                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Τα δεδομένα εξήχθησαν με επιτυχία."))
                 except Exception as ex:
-                    await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εξαγωγής: {ex}"))
+                    print(f"DEBUG: Export Error: {ex}")
+                    await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εξαγωγής: {ex}\nΔοκιμάστε σε άλλο φάκελο (π.χ. Downloads)."))
 
         dialog = toga.SaveFileDialog(
             title="Εξαγωγή Δεδομένων",
@@ -404,7 +428,9 @@ class Farmasave(toga.App):
                 f"Η εισαγωγή για την ημερομηνία {selected_date} θα διαγράψει ΟΛΑ τα τρέχοντα δεδομένα. Συνέχεια;"
             )):
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    # Log the path for debugging
+                    print(f"DEBUG: Importing from {file_path}")
+                    with open(str(file_path), 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     database.import_data(data, selected_date)
                     self.refresh_medications()
@@ -412,6 +438,7 @@ class Farmasave(toga.App):
                     self.refresh_schedule()
                     await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Τα δεδομένα εισήχθησαν με επιτυχία."))
                 except Exception as ex:
+                    print(f"DEBUG: Import Error: {ex}")
                     await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εισαγωγής: {ex}"))
 
         save_btn = toga.Button("Εισαγωγή", on_press=proceed_import, style=Pack(margin=5))
