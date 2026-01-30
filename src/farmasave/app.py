@@ -85,7 +85,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.0.7", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.0.8", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -347,14 +347,17 @@ class Farmasave(toga.App):
             if path:
                 try:
                     data = database.export_data()
-                    # Log the path for debugging
-                    print(f"DEBUG: Exporting to {path}")
-                    with open(str(path), 'w', encoding='utf-8') as f:
+                    
+                    # Convert to string path safely for open()
+                    export_path = str(path)
+                    print(f"DEBUG: Exporting to {export_path}")
+                    
+                    with open(export_path, 'w', encoding='utf-8') as f:
                         json.dump(data, f, ensure_ascii=False, indent=4)
-                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Τα δεδομένα εξήχθησαν με επιτυχία."))
+                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", f"Τα δεδομένα εξήχθησαν επιτυχώς.\nΑρχείο: {os.path.basename(export_path)}"))
                 except Exception as ex:
                     print(f"DEBUG: Export Error: {ex}")
-                    await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εξαγωγής: {ex}\nΔοκιμάστε σε άλλο φάκελο (π.χ. Downloads)."))
+                    await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εξαγωγής: {ex}\nΠροσπαθήστε να αποθηκεύσετε στο φάκελο 'Λήψεις' (Downloads)."))
 
         dialog = toga.SaveFileDialog(
             title="Εξαγωγή Δεδομένων",
@@ -428,15 +431,24 @@ class Farmasave(toga.App):
                 f"Η εισαγωγή για την ημερομηνία {selected_date} θα διαγράψει ΟΛΑ τα τρέχοντα δεδομένα. Συνέχεια;"
             )):
                 try:
-                    # Log the path for debugging
-                    print(f"DEBUG: Importing from {file_path}")
-                    with open(str(file_path), 'r', encoding='utf-8') as f:
+                    # Convert to string path safely
+                    import_path = str(file_path)
+                    print(f"DEBUG: Importing from {import_path}")
+                    
+                    if not os.path.exists(import_path):
+                        # On Android, OpenFileDialog might return a URI-like path or a restricted path
+                        # Here we try to see if we can read it
+                        print(f"DEBUG: Path {import_path} does not exist according to os.path.exists")
+                    
+                    with open(import_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     database.import_data(data, selected_date)
                     self.refresh_medications()
                     self.refresh_stock()
                     self.refresh_schedule()
-                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Τα δεδομένα εισήχθησαν με επιτυχία."))
+                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Η εισαγωγή ολοκληρώθηκε!"))
+                except json.JSONDecodeError:
+                    await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", "Το αρχείο δεν είναι έγκυρο JSON."))
                 except Exception as ex:
                     print(f"DEBUG: Import Error: {ex}")
                     await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εισαγωγής: {ex}"))
