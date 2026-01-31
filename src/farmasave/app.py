@@ -265,7 +265,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.1.8", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.1.9", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -427,8 +427,17 @@ class Farmasave(toga.App):
             )
 
     def create_io_tab(self):
-        export_btn = toga.Button("Εξαγωγή σε JSON", on_press=self.handle_export, style=Pack(margin=5))
-        import_btn = toga.Button("Εισαγωγή από JSON", on_press=self.handle_import_dialog, style=Pack(margin=5))
+        # Wrapper functions for async handlers (buttons need sync wrappers on Android)
+        def do_export_btn(widget):
+            print("DEBUG: Export button pressed")
+            self.add_background_task(lambda app: self._run_export())
+        
+        def do_import_btn(widget):
+            print("DEBUG: Import button pressed")
+            self.add_background_task(lambda app: self._run_import())
+        
+        export_btn = toga.Button("Εξαγωγή σε JSON", on_press=do_export_btn, style=Pack(margin=5))
+        import_btn = toga.Button("Εισαγωγή από JSON", on_press=do_import_btn, style=Pack(margin=5))
         
         # Manual permission button for Android 11+ or failed auto-requests
         perm_btn = toga.Button(
@@ -529,6 +538,93 @@ class Farmasave(toga.App):
             
         content.add(btn_box)
         self.show_view(content)
+
+    async def _run_export(self):
+        """Async wrapper for export - called via add_background_task"""
+        try:
+            print("DEBUG: _run_export started")
+            suggested_name = f"meds_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+            dialog = toga.SaveFileDialog(
+                title="Εξαγωγή Δεδομένων",
+                suggested_filename=suggested_name,
+                file_types=['json'],
+            )
+            path = await self.main_window.dialog(dialog)
+            print(f"DEBUG: Export path selected: {path}")
+            if path:
+                data = database.export_data()
+                export_path = str(path)
+                with open(export_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+                await self.main_window.dialog(toga.InfoDialog("Επιτυχία", f"Τα δεδομένα εξήχθησαν επιτυχώς.\nΑρχείο: {os.path.basename(export_path)}"))
+        except Exception as ex:
+            print(f"DEBUG: Export Error: {ex}")
+            await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εξαγωγής: {ex}"))
+
+    async def _run_import(self):
+        """Async wrapper for import - called via add_background_task"""
+        try:
+            print("DEBUG: _run_import started")
+            dialog = toga.OpenFileDialog(
+                title="Εισαγωγή Δεδομένων",
+                multiple_select=False,
+                file_types=['json'],
+            )
+            path = await self.main_window.dialog(dialog)
+            print(f"DEBUG: Import path selected: {path}")
+            if path:
+                await self._open_date_dialog_for_import(path)
+        except Exception as ex:
+            print(f"DEBUG: Import Error: {ex}")
+            await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εισαγωγής: {ex}"))
+
+    async def _open_date_dialog_for_import(self, file_path):
+        """Date selection for import"""
+        content = toga.Box(style=Pack(direction=COLUMN, margin=10))
+        content.add(toga.Label("Επιλέξτε Ημερομηνία Ελέγχου:", style=Pack(margin_bottom=10)))
+        
+        date_input = toga.DateInput(value=datetime.now().date())
+        content.add(date_input)
+        
+        # Store file_path in self for access in nested function
+        self._pending_import_path = file_path
+        self._pending_date_input = date_input
+        
+        def do_proceed_import(widget):
+            self.add_background_task(lambda app: self._finish_import())
+        
+        save_btn = toga.Button("Εισαγωγή", on_press=do_proceed_import, style=Pack(margin=5))
+        cancel_btn = toga.Button("Ακύρωση", on_press=self.restore_tabs, style=Pack(margin=5))
+        content.add(toga.Box(children=[save_btn, cancel_btn], style=Pack(direction=ROW)))
+        self.show_view(content)
+
+    async def _finish_import(self):
+        """Complete the import after date selection"""
+        try:
+            selected_date = self._pending_date_input.value.strftime("%Y-%m-%d")
+            import_path = str(self._pending_import_path)
+            
+            self.restore_tabs()
+            
+            confirm = await self.main_window.dialog(toga.QuestionDialog(
+                "Προσοχή", 
+                f"Η εισαγωγή για την ημερομηνία {selected_date} θα διαγράψει ΟΛΑ τα τρέχοντα δεδομένα. Συνέχεια;"
+            ))
+            
+            if confirm:
+                print(f"DEBUG: Importing from {import_path}")
+                with open(import_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                database.import_data(data, selected_date)
+                self.refresh_medications()
+                self.refresh_stock()
+                self.refresh_schedule()
+                await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Η εισαγωγή ολοκληρώθηκε!"))
+        except json.JSONDecodeError:
+            await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", "Το αρχείο δεν είναι έγκυρο JSON."))
+        except Exception as ex:
+            print(f"DEBUG: Import Error: {ex}")
+            await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εισαγωγής: {ex}"))
 
     async def handle_export(self, widget):
         """Open a save file dialog to export JSON data"""
