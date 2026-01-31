@@ -11,28 +11,21 @@ AndroidJavaClass = None
 java_import_error = None
 
 def get_android_class(class_name):
-    """Helper to get Java classes using either Rubicon or Chaquopy native"""
-    global AndroidJavaClass
-    if AndroidJavaClass is None:
-        try:
-            from rubicon.java import JavaClass as RubiconJavaClass
-            AndroidJavaClass = RubiconJavaClass
-            print("DEBUG: Using Rubicon Java Bridge")
-        except ImportError:
-            try:
-                from java import jclass as ChaquopyJavaClass
-                AndroidJavaClass = ChaquopyJavaClass
-                print("DEBUG: Using Chaquopy Native Java Bridge")
-            except ImportError as e2:
-                print(f"DEBUG: No Java Bridge available. {e2}")
-                return None
-    
+    """Helper to get Java classes using Chaquopy (primary) or Rubicon"""
+    # Prefer Chaquopy's jclass as it's the native bridge for modern BeeWare/Android
     try:
-        if AndroidJavaClass:
-            return AndroidJavaClass(class_name)
+        from java import jclass
+        return jclass(class_name)
+    except ImportError:
+        try:
+            from rubicon.java import JavaClass
+            return JavaClass(class_name)
+        except ImportError:
+            print(f"DEBUG: No Java bridge available for {class_name}")
+            return None
     except Exception as e:
-        print(f"DEBUG: Failed to load class {class_name}: {e}")
-    return None
+        print(f"DEBUG: Error loading class {class_name}: {e}")
+        return None
 
 try:
     from android.permissions import request_permissions as toga_request_permissions
@@ -202,12 +195,18 @@ class Farmasave(toga.App):
     def startup(self):
         self.main_window = toga.MainWindow(title=self.formal_name)
         
-        # Trigger permission request immediately (silent attempt)
-        self.add_background_task(lambda a: self.request_android_permissions())
-        
-        # Database initialization with platform-specific path
+        # Database initialization
         database.set_db_path(self.paths.data)
         database.create_tables()
+
+        async def initial_setup(app):
+            print("DEBUG: initial_setup background task started")
+            if self.is_android():
+                # Visual confirmation for the user
+                await self.main_window.dialog(toga.InfoDialog("Farmasave v2.5.0", "Η εφαρμογή ξεκινά..."))
+                self.request_android_permissions()
+
+        self.add_background_task(initial_setup)
 
         # Custom Greek menu groups
         ARXEIO_GROUP = toga.Group("Αρχείο", order=0)
@@ -272,7 +271,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.4.1 (Force Fix)", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.5.0 (Scorched Earth)", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -637,8 +636,34 @@ class Farmasave(toga.App):
             print("DEBUG: Import button clicked in I/O tab")
             await self.trigger_import_logic()
 
+        async def check_java_bridge(widget):
+            res = []
+            try:
+                from java import jclass
+                res.append("Chaquopy: OK")
+                try:
+                    Intent = jclass("android.content.Intent")
+                    res.append("Intent Class: OK")
+                except: res.append("Intent Class: FAIL")
+            except:
+                res.append("Chaquopy: FAIL")
+            
+            try:
+                from rubicon.java import JavaClass
+                res.append("Rubicon: OK")
+            except:
+                res.append("Rubicon: FAIL")
+                
+            await self.main_window.dialog(toga.InfoDialog("Java Bridge Status", "\n".join(res)))
+
         export_btn = toga.Button("Εξαγωγή σε JSON", on_press=handle_export_btn, style=Pack(margin=5))
         import_btn = toga.Button("Εισαγωγή από JSON", on_press=handle_import_btn, style=Pack(margin=5))
+        
+        debug_btn = toga.Button(
+            "Έλεγχος Java Bridge (Debug)",
+            on_press=check_java_bridge,
+            style=Pack(margin=5, background_color="gray", color="white")
+        )
         
         perm_btn = toga.Button(
             "Έλεγχος Δικαιωμάτων (Permissions)",
@@ -649,12 +674,13 @@ class Farmasave(toga.App):
         container = toga.Box(
             children=[
                 toga.Label("Διαχείριση Δεδομένων", style=Pack(font_weight='bold', font_size=15, margin_bottom=20)),
+                debug_btn,
                 perm_btn,
                 toga.Box(style=Pack(height=10)),
                 export_btn,
                 import_btn,
                 toga.Box(style=Pack(height=20)),
-                toga.Label("Cross-platform Import/Export (v2.4.0)", 
+                toga.Label("Cross-platform Import/Export (v2.5.0)", 
                           style=Pack(font_size=10, text_align='center'))
             ],
             style=Pack(direction=COLUMN, margin=20)
