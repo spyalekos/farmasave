@@ -265,7 +265,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.2.2", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.3.0", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -426,84 +426,123 @@ class Farmasave(toga.App):
                 (str(id), str(name), str(boxes), str(pieces), str(int(live_balance)), str(initial_total), str(inv_date_str))
             )
 
-    def get_downloads_path(self):
-        """Get the Downloads folder path - works on Android and desktop"""
+    def onActivityResult(self, requestCode, resultCode, data):
+        """Native Android callback for activity results (called by MainActivity)"""
+        print(f"DEBUG: onActivityResult: requestCode={requestCode}, resultCode={resultCode}")
+        
+        # RESULT_OK is -1
+        if resultCode != -1:
+            print("DEBUG: Result not OK, ignoring.")
+            return
+
+        if data is None:
+            print("DEBUG: Data is None, ignoring.")
+            return
+
+        uri = data.getData()
+        if uri is None:
+            print("DEBUG: URI is None, ignoring.")
+            return
+
+        if requestCode == 1001:  # IMPORT
+            print(f"DEBUG: Import URI received: {uri}")
+            self.add_background_task(lambda app: self._handle_import_uri(uri))
+        elif requestCode == 1002:  # EXPORT
+            print(f"DEBUG: Export URI received: {uri}")
+            self.add_background_task(lambda app: self._handle_export_uri(uri))
+
+    async def _handle_import_uri(self, uri):
+        """Read data from the selected URI for import"""
         try:
-            # Try Android Environment class
-            Environment = self.get_android_class("android.os.Environment")
-            downloads_dir = Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOWNLOADS
-            )
-            return str(downloads_dir.getAbsolutePath())
+            context = self.get_android_class("com.chaquo.python.Python").getPlatform().getApplication()
+            content_resolver = context.getContentResolver()
+            input_stream = content_resolver.openInputStream(uri)
+            
+            # Read bytes from stream
+            bytes_data = []
+            while True:
+                b = input_stream.read()
+                if b == -1: break
+                bytes_data.append(b)
+            input_stream.close()
+            
+            content_str = bytes(bytes_data).decode('utf-8')
+            data = json.loads(content_str)
+            
+            # Now show date dialog or proceed directly
+            selected_date = datetime.now().strftime("%Y-%m-%d")
+            confirm = await self.main_window.dialog(toga.QuestionDialog(
+                "Επιβεβαίωση",
+                "Η εισαγωγή θα διαγράψει ΟΛΑ τα τρέχοντα δεδομένα. Συνέχεια;"
+            ))
+            
+            if confirm:
+                database.import_data(data, selected_date)
+                self.refresh_medications()
+                self.refresh_stock()
+                self.refresh_schedule()
+                await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Η εισαγωγή ολοκληρώθηκε!"))
         except Exception as e:
-            print(f"DEBUG: Environment not available: {e}")
-            # Fallback paths
-            android_path = "/storage/emulated/0/Download"
-            if os.path.exists(android_path):
-                return android_path
-            # Desktop fallback
-            home = os.path.expanduser("~")
-            return os.path.join(home, "Downloads")
+            print(f"DEBUG: Import Error: {e}")
+            await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εισαγωγής:\n{e}"))
+
+    async def _handle_export_uri(self, uri):
+        """Write data to the selected URI for export"""
+        try:
+            context = self.get_android_class("com.chaquo.python.Python").getPlatform().getApplication()
+            content_resolver = context.getContentResolver()
+            output_stream = content_resolver.openOutputStream(uri)
+            
+            data = database.export_data()
+            content_str = json.dumps(data, ensure_ascii=False, indent=4)
+            output_stream.write(content_str.encode('utf-8'))
+            output_stream.close()
+            
+            await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Η εξαγωγή ολοκληρώθηκε!"))
+        except Exception as e:
+            print(f"DEBUG: Export Error: {e}")
+            await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εξαγωγής:\n{e}"))
 
     def create_io_tab(self):
-        # Use fixed Downloads path since file dialogs don't work on Android
+        # Native Android File Picker using Intents
         
         async def do_export_btn(widget):
-            """Export to Downloads folder with auto-generated filename"""
-            print("DEBUG: Export button pressed")
+            print("DEBUG: Native Export button pressed")
             try:
-                downloads = self.get_downloads_path()
+                Intent = self.get_android_class("android.content.Intent")
+                if not Intent: raise Exception("Could not load Intent class")
+                
+                intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+                intent.addCategory(Intent.CATEGORY_OPENABLE)
+                intent.setType("application/json")
                 filename = f"meds_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
-                export_path = os.path.join(downloads, filename)
+                intent.putExtra(Intent.EXTRA_TITLE, filename)
                 
-                print(f"DEBUG: Exporting to {export_path}")
-                
-                data = database.export_data()
-                with open(export_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, ensure_ascii=False, indent=4)
-                
-                await self.main_window.dialog(toga.InfoDialog(
-                    "Επιτυχία", 
-                    f"Εξαγωγή ολοκληρώθηκε!\n\nΑρχείο: {filename}\nΦάκελος: Downloads"
-                ))
+                activity = self.get_android_class("com.chaquo.python.Python").getPlatform().getActivity()
+                activity.startActivityForResult(intent, 1002)
             except Exception as ex:
-                print(f"DEBUG: Export error: {ex}")
-                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εξαγωγής:\n{ex}"))
+                print(f"DEBUG: Export trigger error: {ex}")
+                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία: {ex}"))
         
         async def do_import_btn(widget):
-            """Import from Downloads folder - show list of JSON files"""
-            print("DEBUG: Import button pressed")
+            print("DEBUG: Native Import button pressed")
             try:
-                downloads = self.get_downloads_path()
+                Intent = self.get_android_class("android.content.Intent")
+                if not Intent: raise Exception("Could not load Intent class")
                 
-                # Find all JSON files in Downloads
-                json_files = []
-                if os.path.exists(downloads):
-                    for f in os.listdir(downloads):
-                        if f.endswith('.json'):
-                            json_files.append(f)
+                intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                intent.addCategory(Intent.CATEGORY_OPENABLE)
+                intent.setType("application/json")
                 
-                if not json_files:
-                    await self.main_window.dialog(toga.InfoDialog(
-                        "Δεν βρέθηκαν αρχεία",
-                        f"Δεν υπάρχουν αρχεία JSON στο φάκελο Downloads.\n\nΤοποθετήστε το αρχείο σας στο:\n{downloads}"
-                    ))
-                    return
-                
-                # Sort by name (newest first if using our naming convention)
-                json_files.sort(reverse=True)
-                
-                # Show selection UI
-                self._show_import_file_selection(downloads, json_files)
-                
+                activity = self.get_android_class("com.chaquo.python.Python").getPlatform().getActivity()
+                activity.startActivityForResult(intent, 1001)
             except Exception as ex:
-                print(f"DEBUG: Import error: {ex}")
-                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία:\n{ex}"))
+                print(f"DEBUG: Import trigger error: {ex}")
+                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία: {ex}"))
         
         export_btn = toga.Button("Εξαγωγή σε JSON", on_press=do_export_btn, style=Pack(margin=5))
         import_btn = toga.Button("Εισαγωγή από JSON", on_press=do_import_btn, style=Pack(margin=5))
         
-        # Manual permission button for Android 11+ or failed auto-requests
         perm_btn = toga.Button(
             "Έλεγχος Δικαιωμάτων (Permissions)",
             on_press=self.request_android_permissions_manual,
@@ -518,63 +557,13 @@ class Farmasave(toga.App):
                 export_btn,
                 import_btn,
                 toga.Box(style=Pack(height=20)),
-                toga.Label("Τα αρχεία αποθηκεύονται/διαβάζονται από τον φάκελο Downloads", 
+                toga.Label("Χρήση Native Android File Picker", 
                           style=Pack(font_size=10, text_align='center'))
             ],
             style=Pack(direction=COLUMN, margin=20)
         )
         return container
 
-    def _show_import_file_selection(self, downloads_path, json_files):
-        """Show a view to select which JSON file to import"""
-        content = toga.Box(style=Pack(direction=COLUMN, margin=10))
-        content.add(toga.Label("Επιλέξτε αρχείο για εισαγωγή:", style=Pack(font_weight='bold', margin_bottom=10)))
-        
-        # Store for later use
-        self._import_downloads_path = downloads_path
-        
-        for filename in json_files[:10]:  # Limit to 10 files
-            async def select_file(widget, fname=filename):
-                import_path = os.path.join(self._import_downloads_path, fname)
-                await self._do_import_from_path(import_path)
-            
-            btn = toga.Button(filename, on_press=select_file, style=Pack(margin=3))
-            content.add(btn)
-        
-        cancel_btn = toga.Button("Ακύρωση", on_press=self.restore_tabs, style=Pack(margin=10))
-        content.add(cancel_btn)
-        
-        self.show_view(content)
-
-    async def _do_import_from_path(self, import_path):
-        """Perform the actual import from a file path"""
-        try:
-            selected_date = datetime.now().strftime("%Y-%m-%d")
-            
-            confirm = await self.main_window.dialog(toga.QuestionDialog(
-                "Προσοχή", 
-                f"Η εισαγωγή θα διαγράψει ΟΛΑ τα τρέχοντα δεδομένα.\n\nΑρχείο: {os.path.basename(import_path)}\nΣυνέχεια;"
-            ))
-            
-            if confirm:
-                print(f"DEBUG: Importing from {import_path}")
-                with open(import_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                database.import_data(data, selected_date)
-                self.refresh_medications()
-                self.refresh_stock()
-                self.refresh_schedule()
-                self.restore_tabs()
-                await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Εισαγωγή ολοκληρώθηκε!"))
-            else:
-                self.restore_tabs()
-        except json.JSONDecodeError:
-            await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", "Το αρχείο δεν είναι έγκυρο JSON."))
-            self.restore_tabs()
-        except Exception as ex:
-            print(f"DEBUG: Import Error: {ex}")
-            await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εισαγωγής:\n{ex}"))
-            self.restore_tabs()
 
     async def handle_med_activate(self, widget, row):
         med_id = int(row.id)
