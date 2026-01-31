@@ -262,22 +262,22 @@ class Farmasave(toga.App):
         
         # Tab 1: Φάρμακα (Medications)
         self.med_box = self.create_medications_tab()
-        self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
+        self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.2.0", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.2.1", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
-        self.tabs.content.append("Ανάλωση", self.schedule_box, icon="resources/star.png")
+        self.tabs.content.append("Ανάλωση", self.schedule_box)
         
         # Tab 3: Απόθεμα (Stock)
         self.stock_box = self.create_stock_tab()
-        self.tabs.content.append("Απόθεμα", self.stock_box, icon="resources/star.png")
+        self.tabs.content.append("Απόθεμα", self.stock_box)
         
         # Tab 4: I/O (Export/Import)
         self.io_box = self.create_io_tab()
-        self.tabs.content.append("I/O", self.io_box, icon="resources/star.png")
+        self.tabs.content.append("I/O", self.io_box)
         
         self.main_window.content = self.tabs
         self.main_window.show()
@@ -427,26 +427,68 @@ class Farmasave(toga.App):
             )
 
     def create_io_tab(self):
-        # Proper async wrapper functions for add_background_task
-        # add_background_task expects an async function that takes 'app' as parameter
+        # Simple async handlers - Toga buttons support async on_press directly
+        async def do_export_btn(widget):
+            """Direct async handler for export button"""
+            print("DEBUG: Export button pressed")
+            try:
+                # Show dialog to confirm button works
+                await self.main_window.dialog(toga.InfoDialog("Εξαγωγή", "Επιλέξτε τοποθεσία αποθήκευσης..."))
+                
+                suggested_name = f"meds_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+                dialog = toga.SaveFileDialog(
+                    title="Εξαγωγή Δεδομένων",
+                    suggested_filename=suggested_name,
+                    file_types=['json'],
+                )
+                path = await self.main_window.dialog(dialog)
+                print(f"DEBUG: Export path: {path}")
+                
+                if path:
+                    data = database.export_data()
+                    export_path = str(path)
+                    with open(export_path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, ensure_ascii=False, indent=4)
+                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", f"Εξαγωγή ολοκληρώθηκε!\n{os.path.basename(export_path)}"))
+            except Exception as ex:
+                print(f"DEBUG: Export error: {ex}")
+                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία: {ex}"))
         
-        async def do_export_task(app):
-            """Async task for export - properly awaits the coroutine"""
-            print("DEBUG: do_export_task started")
-            await self._run_export()
-        
-        async def do_import_task(app):
-            """Async task for import - properly awaits the coroutine"""
-            print("DEBUG: do_import_task started")
-            await self._run_import()
-        
-        def do_export_btn(widget):
-            print("DEBUG: Export button pressed - scheduling task")
-            self.add_background_task(do_export_task)
-        
-        def do_import_btn(widget):
-            print("DEBUG: Import button pressed - scheduling task")
-            self.add_background_task(do_import_task)
+        async def do_import_btn(widget):
+            """Direct async handler for import button"""
+            print("DEBUG: Import button pressed")
+            try:
+                await self.main_window.dialog(toga.InfoDialog("Εισαγωγή", "Επιλέξτε αρχείο JSON..."))
+                
+                dialog = toga.OpenFileDialog(
+                    title="Εισαγωγή Δεδομένων",
+                    multiple_select=False,
+                    file_types=['json'],
+                )
+                path = await self.main_window.dialog(dialog)
+                print(f"DEBUG: Import path: {path}")
+                
+                if path:
+                    # Ask for date
+                    selected_date = datetime.now().strftime("%Y-%m-%d")
+                    
+                    confirm = await self.main_window.dialog(toga.QuestionDialog(
+                        "Προσοχή", 
+                        f"Η εισαγωγή θα διαγράψει ΟΛΑ τα τρέχοντα δεδομένα. Συνέχεια;"
+                    ))
+                    
+                    if confirm:
+                        import_path = str(path)
+                        with open(import_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        database.import_data(data, selected_date)
+                        self.refresh_medications()
+                        self.refresh_stock()
+                        self.refresh_schedule()
+                        await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Εισαγωγή ολοκληρώθηκε!"))
+            except Exception as ex:
+                print(f"DEBUG: Import error: {ex}")
+                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία: {ex}"))
         
         export_btn = toga.Button("Εξαγωγή σε JSON", on_press=do_export_btn, style=Pack(margin=5))
         import_btn = toga.Button("Εισαγωγή από JSON", on_press=do_import_btn, style=Pack(margin=5))
@@ -461,8 +503,8 @@ class Farmasave(toga.App):
         container = toga.Box(
             children=[
                 toga.Label("Διαχείριση Δεδομένων", style=Pack(font_weight='bold', font_size=15, padding_bottom=20)),
-                perm_btn, # Add permission button first
-                toga.Box(style=Pack(height=10)), # Spacer
+                perm_btn,
+                toga.Box(style=Pack(height=10)),
                 export_btn,
                 import_btn
             ],
