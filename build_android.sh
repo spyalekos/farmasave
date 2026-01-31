@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="2.3.9"
+VERSION="2.4.0"
 APK_SOURCE="build/farmasave/android/gradle/app/build/outputs/apk/debug/app-debug.apk"
 APK_DEST="app-debug-v${VERSION}.apk"
 

@@ -272,7 +272,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.3.9", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.4.0 (Drastic Fix)", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -554,11 +554,15 @@ class Farmasave(toga.App):
                 
                 activity = self._get_activity()
                 if not activity:
-                    raise Exception("MainActivity not available")
+                    print("DEBUG: MainActivity not available")
+                    await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", "Το Android Activity δεν βρέθηκε."))
+                    return
+                print("DEBUG: Launching Intent...")
                 activity.startActivityForResult(intent, 1002)
+                print("DEBUG: Intent launched successfully")
             except Exception as ex:
                 print(f"DEBUG: Android Export triggering error: {ex}")
-                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία: {ex}"))
+                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εκκίνησης Intent: {ex}"))
         else:
             # Desktop
             print("DEBUG: Triggering Toga Desktop Export Dialog")
@@ -568,13 +572,15 @@ class Farmasave(toga.App):
                 file_types=['json'],
             )
             path = await self.main_window.dialog(dialog)
+            print(f"DEBUG: Desktop Export Path: {path}")
             if path:
                 try:
                     data = database.export_data()
                     with open(str(path), 'w', encoding='utf-8') as f:
                         json.dump(data, f, ensure_ascii=False, indent=4)
-                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Η εξαγωγή ολοκληρώθηκε!"))
+                    await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Η εξαγωγή JSON ολοκληρώθηκε!"))
                 except Exception as ex:
+                    print(f"DEBUG: Desktop Export Error: {ex}")
                     await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία: {ex}"))
 
     async def trigger_import_logic(self):
@@ -590,11 +596,15 @@ class Farmasave(toga.App):
                 
                 activity = self._get_activity()
                 if not activity:
-                    raise Exception("MainActivity not available")
+                    print("DEBUG: MainActivity not available")
+                    await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", "Το Android Activity δεν βρέθηκε."))
+                    return
+                print("DEBUG: Launching Intent...")
                 activity.startActivityForResult(intent, 1001)
+                print("DEBUG: Intent launched successfully")
             except Exception as ex:
                 print(f"DEBUG: Android Import triggering error: {ex}")
-                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία: {ex}"))
+                await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εκκίνησης Intent: {ex}"))
         else:
             # Desktop
             print("DEBUG: Triggering Toga Desktop Import Dialog")
@@ -604,6 +614,7 @@ class Farmasave(toga.App):
                 file_types=['json'],
             )
             path = await self.main_window.dialog(dialog)
+            print(f"DEBUG: Desktop Import Path: {path}")
             if path:
                 await self.open_date_selection_dialog(path)
 
@@ -634,7 +645,7 @@ class Farmasave(toga.App):
                 export_btn,
                 import_btn,
                 toga.Box(style=Pack(height=20)),
-                toga.Label("Cross-platform Import/Export Support (v2.3.9)", 
+                toga.Label("Cross-platform Import/Export (v2.4.0)", 
                           style=Pack(font_size=10, text_align='center'))
             ],
             style=Pack(direction=COLUMN, margin=20)
