@@ -262,7 +262,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.5.1 (Stability Fix)", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.6.0 (Final Stability)", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -279,15 +279,12 @@ class Farmasave(toga.App):
         self.main_window.content = self.tabs
         self.main_window.show()
 
-        # POST-SHOW SETUP (CRITICAL: Show window BEFORE calling dialogs/tasks)
+        # POST-SHOW SETUP
         async def initial_setup(app):
             print("DEBUG: initial_setup background task started")
             if self.is_android():
-                # Give a small buffer for the window to settle
-                import asyncio
-                await asyncio.sleep(0.5)
-                # Visual confirmation for the user
-                await self.main_window.dialog(toga.InfoDialog("Farmasave v2.5.1", "Η εφαρμογή ξεκίνησε επιτυχώς!"))
+                # Visual confirmation
+                await self.main_window.dialog(toga.InfoDialog("Farmasave v2.6.0", "Η εφαρμογή ξεκίνησε!"))
                 self.request_android_permissions()
 
         self.add_background_task(initial_setup)
@@ -979,4 +976,4 @@ class Farmasave(toga.App):
         self.show_view(content)
 
 def main():
-    return Farmasave("Farmasave", "com.spyalekos.farmasave", version="2.4.1")
+    return Farmasave("Farmasave", "com.spyalekos.farmasave", version="2.6.0")
