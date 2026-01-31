@@ -265,7 +265,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.3.0", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.3.1", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -454,7 +454,7 @@ class Farmasave(toga.App):
     async def _handle_import_uri(self, uri):
         """Read data from the selected URI for import"""
         try:
-            context = self.get_android_class("com.chaquo.python.Python").getPlatform().getApplication()
+            context = get_android_class("com.chaquo.python.Python").getPlatform().getApplication()
             content_resolver = context.getContentResolver()
             input_stream = content_resolver.openInputStream(uri)
             
@@ -489,7 +489,7 @@ class Farmasave(toga.App):
     async def _handle_export_uri(self, uri):
         """Write data to the selected URI for export"""
         try:
-            context = self.get_android_class("com.chaquo.python.Python").getPlatform().getApplication()
+            context = get_android_class("com.chaquo.python.Python").getPlatform().getApplication()
             content_resolver = context.getContentResolver()
             output_stream = content_resolver.openOutputStream(uri)
             
@@ -509,7 +509,7 @@ class Farmasave(toga.App):
         async def do_export_btn(widget):
             print("DEBUG: Native Export button pressed")
             try:
-                Intent = self.get_android_class("android.content.Intent")
+                Intent = get_android_class("android.content.Intent")
                 if not Intent: raise Exception("Could not load Intent class")
                 
                 intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
@@ -518,7 +518,7 @@ class Farmasave(toga.App):
                 filename = f"meds_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
                 intent.putExtra(Intent.EXTRA_TITLE, filename)
                 
-                activity = self.get_android_class("com.chaquo.python.Python").getPlatform().getActivity()
+                activity = get_android_class("com.chaquo.python.Python").getPlatform().getActivity()
                 activity.startActivityForResult(intent, 1002)
             except Exception as ex:
                 print(f"DEBUG: Export trigger error: {ex}")
@@ -527,14 +527,14 @@ class Farmasave(toga.App):
         async def do_import_btn(widget):
             print("DEBUG: Native Import button pressed")
             try:
-                Intent = self.get_android_class("android.content.Intent")
+                Intent = get_android_class("android.content.Intent")
                 if not Intent: raise Exception("Could not load Intent class")
                 
                 intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
                 intent.addCategory(Intent.CATEGORY_OPENABLE)
                 intent.setType("application/json")
                 
-                activity = self.get_android_class("com.chaquo.python.Python").getPlatform().getActivity()
+                activity = get_android_class("com.chaquo.python.Python").getPlatform().getActivity()
                 activity.startActivityForResult(intent, 1001)
             except Exception as ex:
                 print(f"DEBUG: Import trigger error: {ex}")
