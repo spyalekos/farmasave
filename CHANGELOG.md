@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v2.3.6
+- Fixed 0-byte export issue on Android by ensuring stream flush.
+- Unified Import/Export logic for all platforms.
+- Fixed top menu commands on Desktop.
+
 ## v2.3.4
 - Added support for Windows (toga-winforms).
 

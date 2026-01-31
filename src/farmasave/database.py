@@ -11,6 +11,7 @@ def set_db_path(data_path):
     global DB_NAME
     if data_path:
         DB_NAME = os.path.join(data_path, 'medications.db')
+        print(f"DEBUG: Database path set to: {DB_NAME}")
 
 
 def create_tables():
