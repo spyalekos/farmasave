@@ -216,10 +216,13 @@ class Farmasave(toga.App):
 
         # Wrapper functions for async handlers
         # Standard Toga handlers are automatically async-aware
+        # Wrapper functions for async handlers
         async def do_import(widget):
+            print("DEBUG: Import command triggered from menu")
             await self.trigger_import_logic()
         
         async def do_export(widget):
+            print("DEBUG: Export command triggered from menu")
             await self.trigger_export_logic()
 
         # Commands for the menu
@@ -237,6 +240,7 @@ class Farmasave(toga.App):
             group=ARXEIO_GROUP,
             order=2
         )
+        # ... rest of commands ...
         self.schedule_view_cmd = toga.Command(
             self.handle_schedule_view,
             text="Ανάλωση (Πρόγραμμα)",
@@ -268,7 +272,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.3.8", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.3.9", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -605,8 +609,16 @@ class Farmasave(toga.App):
 
     def create_io_tab(self):
         """Build the data management tab"""
-        export_btn = toga.Button("Εξαγωγή σε JSON", on_press=self.trigger_export_logic, style=Pack(margin=5))
-        import_btn = toga.Button("Εισαγωγή από JSON", on_press=self.trigger_import_logic, style=Pack(margin=5))
+        async def handle_export_btn(widget):
+            print("DEBUG: Export button clicked in I/O tab")
+            await self.trigger_export_logic()
+
+        async def handle_import_btn(widget):
+            print("DEBUG: Import button clicked in I/O tab")
+            await self.trigger_import_logic()
+
+        export_btn = toga.Button("Εξαγωγή σε JSON", on_press=handle_export_btn, style=Pack(margin=5))
+        import_btn = toga.Button("Εισαγωγή από JSON", on_press=handle_import_btn, style=Pack(margin=5))
         
         perm_btn = toga.Button(
             "Έλεγχος Δικαιωμάτων (Permissions)",
@@ -622,7 +634,7 @@ class Farmasave(toga.App):
                 export_btn,
                 import_btn,
                 toga.Box(style=Pack(height=20)),
-                toga.Label("Cross-platform Import/Export Support", 
+                toga.Label("Cross-platform Import/Export Support (v2.3.9)", 
                           style=Pack(font_size=10, text_align='center'))
             ],
             style=Pack(direction=COLUMN, margin=20)
