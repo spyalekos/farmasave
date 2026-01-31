@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v2.3.4
+- Added support for Windows (toga-winforms).
+
+## v2.3.3
+- Added Linux compatibility and platform-aware I/O.
+- Fixed building issues for desktop.
+
 ## v2.3.2
 - Fixed Android native file picker Activity access.
 
