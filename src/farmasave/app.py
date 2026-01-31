@@ -192,6 +192,62 @@ class Farmasave(toga.App):
         except Exception as e:
             self.main_window.error_dialog("Error", f"Crash during request:\n{e}")
 
+    def python_on_activity_result(self, requestCode, resultCode, data):
+        """Native callback from MainActivity.java"""
+        print(f"DEBUG: python_on_activity_result hit! req={requestCode}, res={resultCode}")
+        
+        if requestCode == 1001 and resultCode == -1: # Import
+            print("DEBUG: Import Result OK")
+            uri = data.getData()
+            self.add_background_task(lambda app: self._handle_import_uri(uri))
+            
+        elif requestCode == 1002 and resultCode == -1: # Export
+            print("DEBUG: Export Result OK")
+            uri = data.getData()
+            self.add_background_task(lambda app: self._handle_export_uri(uri))
+            
+    async def _handle_import_uri(self, uri):
+        try:
+            print(f"DEBUG: Handling Import URI: {uri}")
+            activity = self._get_activity()
+            content_resolver = activity.getContentResolver()
+            
+            # Read content from URI
+            input_stream = content_resolver.openInputStream(uri)
+            # Read into byte array buffer
+            scanner = get_android_class("java.util.Scanner")(input_stream).useDelimiter("\\A")
+            json_str = ""
+            if scanner.hasNext():
+                json_str = scanner.next()
+            input_stream.close()
+            
+            data = json.loads(json_str)
+            
+            # Ask for confirmation (Async dialog needs to be awaited)
+            # Since we are in a background task lambda, we can await
+            confirm = await self.main_window.dialog(toga.QuestionDialog(
+                "Επιβεβαίωση",
+                "Η εισαγωγή θα αντικαταστήσει τα υπάρχοντα δεδομένα. Συνέχεια;"
+            ))
+            
+            if confirm:
+                database.import_data(data, datetime.now().date())
+                self.refresh_medications()
+                self.refresh_stock()
+                self.refresh_schedule()
+                await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Η εισαγωγή ολοκληρώθηκε!"))
+                
+        except Exception as e:
+            print(f"DEBUG: Import Error: {e}")
+            await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"{e}"))
+
+    def python_on_request_permissions_result(self, requestCode, permissions, grantResults):
+        """Native callback for permissions"""
+        print(f"DEBUG: Permissions Result: req={requestCode}, grants={grantResults}")
+        if requestCode == 100:
+            # We can inspect grantResults here if we want to confirm
+            pass
+
     def startup(self):
         self.main_window = toga.MainWindow(title=self.formal_name)
         
@@ -262,7 +318,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.6.0 (Final Stability)", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.7.0 (Unified)", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -284,7 +340,7 @@ class Farmasave(toga.App):
             print("DEBUG: initial_setup background task started")
             if self.is_android():
                 # Visual confirmation
-                await self.main_window.dialog(toga.InfoDialog("Farmasave v2.6.0", "Η εφαρμογή ξεκίνησε!"))
+                await self.main_window.dialog(toga.InfoDialog("Farmasave v2.7.0", "Η εφαρμογή ξεκίνησε!"))
                 self.request_android_permissions()
 
         self.add_background_task(initial_setup)
@@ -651,9 +707,9 @@ class Farmasave(toga.App):
             
             try:
                 from rubicon.java import JavaClass
-                res.append("Rubicon: OK")
+                res.append("Rubicon: OK (Not used efficiently on Chaquopy)")
             except:
-                res.append("Rubicon: FAIL")
+                res.append("Rubicon: FAIL (Expected if using native Chaquopy)")
                 
             await self.main_window.dialog(toga.InfoDialog("Java Bridge Status", "\n".join(res)))
 
@@ -681,7 +737,7 @@ class Farmasave(toga.App):
                 export_btn,
                 import_btn,
                 toga.Box(style=Pack(height=20)),
-                toga.Label("Cross-platform Import/Export (v2.5.0)", 
+                toga.Label("Cross-platform Import/Export (v2.7.0)", 
                           style=Pack(font_size=10, text_align='center'))
             ],
             style=Pack(direction=COLUMN, margin=20)
@@ -976,4 +1032,4 @@ class Farmasave(toga.App):
         self.show_view(content)
 
 def main():
-    return Farmasave("Farmasave", "com.spyalekos.farmasave", version="2.6.0")
+    return Farmasave("Farmasave", "com.spyalekos.farmasave", version="2.7.0")
