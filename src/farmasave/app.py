@@ -4,6 +4,8 @@ from toga.style.pack import COLUMN, ROW
 import os
 import json
 from datetime import datetime
+import sys
+
 # Robust Java Access (Rubicon vs Chaquopy Native)
 AndroidJavaClass = None
 java_import_error = None
@@ -265,7 +267,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.3.2", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.3.3", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -507,37 +509,92 @@ class Farmasave(toga.App):
         # Native Android File Picker using Intents
         
         async def do_export_btn(widget):
-            print("DEBUG: Native Export button pressed")
+            print("DEBUG: Export button pressed")
+            suggested_name = f"meds_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+            
             try:
-                Intent = get_android_class("android.content.Intent")
-                if not Intent: raise Exception("Could not load Intent class")
-                
-                intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
-                intent.addCategory(Intent.CATEGORY_OPENABLE)
-                intent.setType("application/json")
-                filename = f"meds_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
-                intent.putExtra(Intent.EXTRA_TITLE, filename)
-                
-                activity = get_android_class("org.beeware.android.MainActivity").singletonThis
-                activity.startActivityForResult(intent, 1002)
+                # Try Native Android first
+                is_android = False
+                try:
+                    Intent = get_android_class("android.content.Intent")
+                    if Intent:
+                        is_android = True
+                except:
+                    pass
+
+                if is_android:
+                    print("DEBUG: Using Native Android Export")
+                    intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+                    intent.addCategory(Intent.CATEGORY_OPENABLE)
+                    intent.setType("application/json")
+                    intent.putExtra(Intent.EXTRA_TITLE, suggested_name)
+                    activity = get_android_class("org.beeware.android.MainActivity").singletonThis
+                    activity.startActivityForResult(intent, 1002)
+                else:
+                    # Linux / Desktop fallback
+                    print("DEBUG: Using Toga Desktop Export")
+                    dialog = toga.SaveFileDialog(
+                        title="Εξαγωγή Δεδομένων",
+                        suggested_filename=suggested_name,
+                        file_types=['json'],
+                    )
+                    path = await self.main_window.dialog(dialog)
+                    if path:
+                        data = database.export_data()
+                        with open(str(path), 'w', encoding='utf-8') as f:
+                            json.dump(data, f, ensure_ascii=False, indent=4)
+                        await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Η εξαγωγή ολοκληρώθηκε!"))
             except Exception as ex:
-                print(f"DEBUG: Export trigger error: {ex}")
+                print(f"DEBUG: Export error: {ex}")
                 await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία: {ex}"))
         
         async def do_import_btn(widget):
-            print("DEBUG: Native Import button pressed")
+            print("DEBUG: Import button pressed")
             try:
-                Intent = get_android_class("android.content.Intent")
-                if not Intent: raise Exception("Could not load Intent class")
-                
-                intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-                intent.addCategory(Intent.CATEGORY_OPENABLE)
-                intent.setType("application/json")
-                
-                activity = get_android_class("org.beeware.android.MainActivity").singletonThis
-                activity.startActivityForResult(intent, 1001)
+                # Try Native Android first
+                is_android = False
+                try:
+                    Intent = get_android_class("android.content.Intent")
+                    if Intent:
+                        is_android = True
+                except:
+                    pass
+
+                if is_android:
+                    print("DEBUG: Using Native Android Import")
+                    intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                    intent.addCategory(Intent.CATEGORY_OPENABLE)
+                    intent.setType("application/json")
+                    activity = get_android_class("org.beeware.android.MainActivity").singletonThis
+                    activity.startActivityForResult(intent, 1001)
+                else:
+                    # Linux / Desktop fallback
+                    print("DEBUG: Using Toga Desktop Import")
+                    dialog = toga.OpenFileDialog(
+                        title="Εισαγωγή Δεδομένων",
+                        multiple_select=False,
+                        file_types=['json'],
+                    )
+                    path = await self.main_window.dialog(dialog)
+                    if path:
+                        import_path = str(path)
+                        with open(import_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        
+                        confirm = await self.main_window.dialog(toga.QuestionDialog(
+                            "Προσοχή", 
+                            "Η εισαγωγή θα διαγράψει ΟΛΑ τα τρέχοντα δεδομένα. Συνέχεια;"
+                        ))
+                        
+                        if confirm:
+                            selected_date = datetime.now().strftime("%Y-%m-%d")
+                            database.import_data(data, selected_date)
+                            self.refresh_medications()
+                            self.refresh_stock()
+                            self.refresh_schedule()
+                            await self.main_window.dialog(toga.InfoDialog("Επιτυχία", "Η εισαγωγή ολοκληρώθηκε!"))
             except Exception as ex:
-                print(f"DEBUG: Import trigger error: {ex}")
+                print(f"DEBUG: Import error: {ex}")
                 await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία: {ex}"))
         
         export_btn = toga.Button("Εξαγωγή σε JSON", on_press=do_export_btn, style=Pack(margin=5))

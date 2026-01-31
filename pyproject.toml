@@ -1,7 +1,7 @@
 [tool.briefcase]
 project_name = "Farmasave"
 bundle = "com.spyalekos"
-version = "2.3.2"
+version = "2.3.3"
 url = "https://github.com/spyalekos/farmasave"
 license.text = "Other/Proprietary"
 author = "SpyAlekos"
@@ -10,7 +10,7 @@ author_email = "spyalekos@gmail.com"
 [tool.briefcase.app.farmasave]
 formal_name = "Farmasave"
 description = "Διαχειριστής Φαρμάκων"
-version = "2.3.2"
+version = "2.3.3"
 sources = ["src/farmasave"]
 requires = [
     "fpdf2>=2.8.5",
