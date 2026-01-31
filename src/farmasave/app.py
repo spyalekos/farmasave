@@ -272,7 +272,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.4.0 (Drastic Fix)", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.4.1 (Force Fix)", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -435,7 +435,16 @@ class Farmasave(toga.App):
 
     def onActivityResult(self, requestCode, resultCode, data):
         """Native Android callback for activity results (called by MainActivity)"""
-        print(f"DEBUG: onActivityResult: requestCode={requestCode}, resultCode={resultCode}")
+        print(f"DEBUG: onActivityResult sync start: {requestCode}")
+        # Delegate to async handler
+        self.add_background_task(lambda app: self._async_onActivityResult(requestCode, resultCode, data))
+
+    async def _async_onActivityResult(self, requestCode, resultCode, data):
+        """Async handler for activity results"""
+        print(f"DEBUG: _async_onActivityResult start: {requestCode}")
+        
+        # PROVIDE VISUAL FEEDBACK
+        await self.main_window.dialog(toga.InfoDialog("DEBUG", f"Data received! code={requestCode}"))
         
         # RESULT_OK is -1
         if resultCode != -1:
@@ -453,10 +462,10 @@ class Farmasave(toga.App):
 
         if requestCode == 1001:  # IMPORT
             print(f"DEBUG: Import URI received: {uri}")
-            self.add_background_task(lambda app: self._handle_import_uri(uri))
+            await self._handle_import_uri(uri)
         elif requestCode == 1002:  # EXPORT
             print(f"DEBUG: Export URI received: {uri}")
-            self.add_background_task(lambda app: self._handle_export_uri(uri))
+            await self._handle_export_uri(uri)
 
     def _get_activity(self):
         """Helper to get the singleton MainActivity"""
@@ -940,4 +949,4 @@ class Farmasave(toga.App):
         self.show_view(content)
 
 def main():
-    return Farmasave("Farmasave", "com.spyalekos.farmasave")
+    return Farmasave("Farmasave", "com.spyalekos.farmasave", version="2.4.1")
