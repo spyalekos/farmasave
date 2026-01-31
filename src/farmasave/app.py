@@ -265,7 +265,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.3.1", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.3.2", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -454,7 +454,7 @@ class Farmasave(toga.App):
     async def _handle_import_uri(self, uri):
         """Read data from the selected URI for import"""
         try:
-            context = get_android_class("com.chaquo.python.Python").getPlatform().getApplication()
+            context = get_android_class("org.beeware.android.MainActivity").singletonThis
             content_resolver = context.getContentResolver()
             input_stream = content_resolver.openInputStream(uri)
             
@@ -489,7 +489,7 @@ class Farmasave(toga.App):
     async def _handle_export_uri(self, uri):
         """Write data to the selected URI for export"""
         try:
-            context = get_android_class("com.chaquo.python.Python").getPlatform().getApplication()
+            context = get_android_class("org.beeware.android.MainActivity").singletonThis
             content_resolver = context.getContentResolver()
             output_stream = content_resolver.openOutputStream(uri)
             
@@ -518,7 +518,7 @@ class Farmasave(toga.App):
                 filename = f"meds_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
                 intent.putExtra(Intent.EXTRA_TITLE, filename)
                 
-                activity = get_android_class("com.chaquo.python.Python").getPlatform().getActivity()
+                activity = get_android_class("org.beeware.android.MainActivity").singletonThis
                 activity.startActivityForResult(intent, 1002)
             except Exception as ex:
                 print(f"DEBUG: Export trigger error: {ex}")
@@ -534,7 +534,7 @@ class Farmasave(toga.App):
                 intent.addCategory(Intent.CATEGORY_OPENABLE)
                 intent.setType("application/json")
                 
-                activity = get_android_class("com.chaquo.python.Python").getPlatform().getActivity()
+                activity = get_android_class("org.beeware.android.MainActivity").singletonThis
                 activity.startActivityForResult(intent, 1001)
             except Exception as ex:
                 print(f"DEBUG: Import trigger error: {ex}")
