@@ -199,15 +199,6 @@ class Farmasave(toga.App):
         database.set_db_path(self.paths.data)
         database.create_tables()
 
-        async def initial_setup(app):
-            print("DEBUG: initial_setup background task started")
-            if self.is_android():
-                # Visual confirmation for the user
-                await self.main_window.dialog(toga.InfoDialog("Farmasave v2.5.0", "Η εφαρμογή ξεκινά..."))
-                self.request_android_permissions()
-
-        self.add_background_task(initial_setup)
-
         # Custom Greek menu groups
         ARXEIO_GROUP = toga.Group("Αρχείο", order=0)
         PROBOLI_GROUP = toga.Group("Προβολή", order=1)
@@ -271,7 +262,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.5.0 (Scorched Earth)", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.5.1 (Stability Fix)", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -287,6 +278,19 @@ class Farmasave(toga.App):
         
         self.main_window.content = self.tabs
         self.main_window.show()
+
+        # POST-SHOW SETUP (CRITICAL: Show window BEFORE calling dialogs/tasks)
+        async def initial_setup(app):
+            print("DEBUG: initial_setup background task started")
+            if self.is_android():
+                # Give a small buffer for the window to settle
+                import asyncio
+                await asyncio.sleep(0.5)
+                # Visual confirmation for the user
+                await self.main_window.dialog(toga.InfoDialog("Farmasave v2.5.1", "Η εφαρμογή ξεκίνησε επιτυχώς!"))
+                self.request_android_permissions()
+
+        self.add_background_task(initial_setup)
 
     def restore_tabs(self, widget=None):
         """Restore the main tab view"""
