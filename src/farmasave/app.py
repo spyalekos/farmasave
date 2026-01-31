@@ -215,11 +215,12 @@ class Farmasave(toga.App):
         VOITHEIA_GROUP = toga.Group("Βοήθεια", order=99)
 
         # Wrapper functions for async handlers
-        def do_import(widget):
-            self.add_background_task(lambda app: self.trigger_import_logic())
+        # Standard Toga handlers are automatically async-aware
+        async def do_import(widget):
+            await self.trigger_import_logic()
         
-        def do_export(widget):
-            self.add_background_task(lambda app: self.trigger_export_logic())
+        async def do_export(widget):
+            await self.trigger_export_logic()
 
         # Commands for the menu
         self.import_cmd = toga.Command(
@@ -267,7 +268,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.3.6", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.3.7", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -518,11 +519,8 @@ class Farmasave(toga.App):
             await self.main_window.dialog(toga.ErrorDialog("Σφάλμα", f"Αποτυχία εξαγωγής:\n{e}"))
 
     def is_android(self):
-        """Check if running on Android"""
-        try:
-            return get_android_class("android.os.Build") is not None
-        except:
-            return False
+        """Check if running on Android using sys.platform"""
+        return sys.platform == "android"
 
     async def trigger_export_logic(self):
         """Unified export logic for all platforms"""
@@ -591,8 +589,8 @@ class Farmasave(toga.App):
 
     def create_io_tab(self):
         """Build the data management tab"""
-        export_btn = toga.Button("Εξαγωγή σε JSON", on_press=lambda w: self.add_background_task(lambda a: self.trigger_export_logic()), style=Pack(margin=5))
-        import_btn = toga.Button("Εισαγωγή από JSON", on_press=lambda w: self.add_background_task(lambda a: self.trigger_import_logic()), style=Pack(margin=5))
+        export_btn = toga.Button("Εξαγωγή σε JSON", on_press=self.trigger_export_logic, style=Pack(margin=5))
+        import_btn = toga.Button("Εισαγωγή από JSON", on_press=self.trigger_import_logic, style=Pack(margin=5))
         
         perm_btn = toga.Button(
             "Έλεγχος Δικαιωμάτων (Permissions)",

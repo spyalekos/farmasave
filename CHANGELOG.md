@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v2.3.7
+- Fixed Android Picker regression by improving platform detection.
+- Simplified button handlers for better responsiveness.
+- Maintained Android 0-byte export fix.
+
 ## v2.3.6
 - Fixed 0-byte export issue on Android by ensuring stream flush.
 - Unified Import/Export logic for all platforms.
