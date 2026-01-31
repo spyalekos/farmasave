@@ -33,7 +33,7 @@ class PDF(FPDF):
 class MedicationApp:
     def __init__(self, page: ft.Page):
         self.page = page
-        self.page.title = "Διαχειριστής Φαρμάκων v2.05"
+        self.page.title = "Διαχειριστής Φαρμάκων v2.3.8"
         self.page.window.width = 1200
         self.page.window.height = 700
         self.page.theme_mode = ft.ThemeMode.LIGHT

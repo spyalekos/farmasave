@@ -268,7 +268,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box)
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.3.7", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.3.8", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -454,11 +454,21 @@ class Farmasave(toga.App):
             print(f"DEBUG: Export URI received: {uri}")
             self.add_background_task(lambda app: self._handle_export_uri(uri))
 
+    def _get_activity(self):
+        """Helper to get the singleton MainActivity"""
+        try:
+            return get_android_class("org.beeware.android.MainActivity").singletonThis
+        except Exception as e:
+            print(f"DEBUG: Failed to get activity: {e}")
+            return None
+
     async def _handle_import_uri(self, uri):
         """Read data from the selected URI for import"""
         try:
-            context = get_android_class("org.beeware.android.MainActivity").singletonThis
-            content_resolver = context.getContentResolver()
+            activity = self._get_activity()
+            if not activity:
+                raise Exception("MainActivity not available")
+            content_resolver = activity.getContentResolver()
             input_stream = content_resolver.openInputStream(uri)
             
             # Read bytes from stream
@@ -500,7 +510,9 @@ class Farmasave(toga.App):
             data_bytes = content_str.encode('utf-8')
             print(f"DEBUG: JSON byte length: {len(data_bytes)}")
             
-            activity = get_android_class("org.beeware.android.MainActivity").singletonThis
+            activity = self._get_activity()
+            if not activity:
+                raise Exception("MainActivity not available")
             content_resolver = activity.getContentResolver()
             
             # Use "wt" to truncate existing file
@@ -536,7 +548,9 @@ class Farmasave(toga.App):
                 intent.setType("application/json")
                 intent.putExtra(Intent.EXTRA_TITLE, suggested_name)
                 
-                activity = get_android_class("org.beeware.android.MainActivity").singletonThis
+                activity = self._get_activity()
+                if not activity:
+                    raise Exception("MainActivity not available")
                 activity.startActivityForResult(intent, 1002)
             except Exception as ex:
                 print(f"DEBUG: Android Export triggering error: {ex}")
@@ -570,7 +584,9 @@ class Farmasave(toga.App):
                 intent.addCategory(Intent.CATEGORY_OPENABLE)
                 intent.setType("application/json")
                 
-                activity = get_android_class("org.beeware.android.MainActivity").singletonThis
+                activity = self._get_activity()
+                if not activity:
+                    raise Exception("MainActivity not available")
                 activity.startActivityForResult(intent, 1001)
             except Exception as ex:
                 print(f"DEBUG: Android Import triggering error: {ex}")
