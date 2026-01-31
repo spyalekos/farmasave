@@ -265,7 +265,7 @@ class Farmasave(toga.App):
         self.tabs.content.append("Φάρμακα", self.med_box, icon="resources/star.png")
 
         # Version label footer
-        self.med_box.add(toga.Label("v2.1.9", style=Pack(font_size=8, text_align='right', padding=5)))
+        self.med_box.add(toga.Label("v2.2.0", style=Pack(font_size=8, text_align='right', padding=5)))
         
         # Tab 2: Ανάλωση (Schedule/Consumption)
         self.schedule_box = self.create_schedule_tab()
@@ -427,14 +427,26 @@ class Farmasave(toga.App):
             )
 
     def create_io_tab(self):
-        # Wrapper functions for async handlers (buttons need sync wrappers on Android)
+        # Proper async wrapper functions for add_background_task
+        # add_background_task expects an async function that takes 'app' as parameter
+        
+        async def do_export_task(app):
+            """Async task for export - properly awaits the coroutine"""
+            print("DEBUG: do_export_task started")
+            await self._run_export()
+        
+        async def do_import_task(app):
+            """Async task for import - properly awaits the coroutine"""
+            print("DEBUG: do_import_task started")
+            await self._run_import()
+        
         def do_export_btn(widget):
-            print("DEBUG: Export button pressed")
-            self.add_background_task(lambda app: self._run_export())
+            print("DEBUG: Export button pressed - scheduling task")
+            self.add_background_task(do_export_task)
         
         def do_import_btn(widget):
-            print("DEBUG: Import button pressed")
-            self.add_background_task(lambda app: self._run_import())
+            print("DEBUG: Import button pressed - scheduling task")
+            self.add_background_task(do_import_task)
         
         export_btn = toga.Button("Εξαγωγή σε JSON", on_press=do_export_btn, style=Pack(margin=5))
         import_btn = toga.Button("Εισαγωγή από JSON", on_press=do_import_btn, style=Pack(margin=5))
